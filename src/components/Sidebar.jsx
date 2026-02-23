@@ -34,7 +34,7 @@ export default function Sidebar() {
                 <button className="hamburger-btn" onClick={() => setOpen(true)}>
                     <Menu size={24} />
                 </button>
-                <span className="mobile-brand">🎱 LigaPro Sinuca</span>
+                <span className="mobile-brand">🎱 A.C.L.S</span>
                 <div style={{ width: 40 }} />
             </div>
 
@@ -49,8 +49,8 @@ export default function Sidebar() {
                 <div className="sidebar-header">
                     <div className="sidebar-logo">🎱</div>
                     <div className="sidebar-brand">
-                        <h1>LigaPro</h1>
-                        <span>Sinuca</span>
+                        <h1>A.C.L.S</h1>
+                        <span>App</span>
                     </div>
                     <button
                         className="hamburger-btn"
@@ -80,7 +80,7 @@ export default function Sidebar() {
 
                 <div className="sidebar-footer">
                     <p className="sidebar-footer-text">
-                        LigaPro Sinuca v1.0<br />
+                        A.C.L.S v1.0<br />
                         © 2026 Todos os direitos reservados
                     </p>
                 </div>
