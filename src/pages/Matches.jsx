@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSelective, deleteSelective } from '../data/db.js';
+import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSelective, deleteSelective, createMatch } from '../data/db.js';
 import { applyMatchResult, reverseMatchResult, getHeadToHeadResult } from '../data/rankingEngine.js';
 import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader } from 'lucide-react';
 
@@ -45,9 +45,23 @@ export default function Matches() {
         loadData();
     }, [refresh, activeSelectiveId]);
 
+    // ── Find the next-round match that this match feeds into ──
+    function findNextRoundMatch(match, allMatches) {
+        const nextRound = match.round + 1;
+        const nextBracketPos = Math.floor(match.bracketPosition / 2);
+        return allMatches.find(m => m.round === nextRound && m.bracketPosition === nextBracketPos);
+    }
+
+    // ── Which slot (player1 or player2) this match feeds into ──
+    function getSlotInNextMatch(match) {
+        // Even bracketPosition → player1 slot, Odd → player2 slot
+        return match.bracketPosition % 2 === 0 ? 'player1Id' : 'player2Id';
+    }
+
     async function handleSetWinner(match, winnerId) {
         setLoading(true);
         const loserId = winnerId === match.player1Id ? match.player2Id : match.player1Id;
+        const selective = selectives.find(s => s.id === activeSelectiveId);
 
         // Update match
         await updateMatch(match.id, {
@@ -57,21 +71,45 @@ export default function Matches() {
             status: 'completed'
         });
 
-        // Apply ranking
-        const selective = selectives.find(s => s.id === activeSelectiveId);
-        await applyMatchResult(winnerId, loserId, selective?.config);
+        // Apply ranking (only for real matches, not BYEs)
+        if (match.player1Id && match.player2Id) {
+            await applyMatchResult(winnerId, loserId, selective?.config);
+        }
+
+        // ── Elimination auto-advance ──
+        if (selective?.mode === 'elimination' && match.bracketPosition != null) {
+            const allMatches = await getMatchesBySelective(activeSelectiveId);
+            const nextMatch = findNextRoundMatch(match, allMatches);
+            if (nextMatch) {
+                const slot = getSlotInNextMatch(match);
+                await updateMatch(nextMatch.id, { [slot]: winnerId });
+            }
+        }
 
         setRefresh(r => r + 1);
     }
 
     async function handleUndoResult(match) {
         if (!match.winnerId) return;
-        setLoading(true);
-        const loserId = match.winnerId === match.player1Id ? match.player2Id : match.player1Id;
         const selective = selectives.find(s => s.id === activeSelectiveId);
 
-        // Reverse ranking impact
-        await reverseMatchResult(match.winnerId, loserId, selective?.config);
+        // ── Elimination: check if next match was already played ──
+        if (selective?.mode === 'elimination' && match.bracketPosition != null) {
+            const allMatches = await getMatchesBySelective(activeSelectiveId);
+            const nextMatch = findNextRoundMatch(match, allMatches);
+            if (nextMatch && nextMatch.status === 'completed') {
+                alert('Não é possível desfazer: a próxima partida do bracket já foi jogada. Desfaça ela primeiro.');
+                return;
+            }
+        }
+
+        setLoading(true);
+        const loserId = match.winnerId === match.player1Id ? match.player2Id : match.player1Id;
+
+        // Reverse ranking impact (only for real matches, not BYEs)
+        if (match.player1Id && match.player2Id) {
+            await reverseMatchResult(match.winnerId, loserId, selective?.config);
+        }
 
         // Reset match to pending
         await updateMatch(match.id, {
@@ -80,6 +118,16 @@ export default function Matches() {
             score2: null,
             status: 'pending'
         });
+
+        // ── Elimination: remove winner from next match ──
+        if (selective?.mode === 'elimination' && match.bracketPosition != null) {
+            const allMatches = await getMatchesBySelective(activeSelectiveId);
+            const nextMatch = findNextRoundMatch(match, allMatches);
+            if (nextMatch) {
+                const slot = getSlotInNextMatch(match);
+                await updateMatch(nextMatch.id, { [slot]: null });
+            }
+        }
 
         setRefresh(r => r + 1);
     }
@@ -115,8 +163,13 @@ export default function Matches() {
     }
 
     const activeSelective = selectives.find(s => s.id === activeSelectiveId);
-    const completedCount = matches.filter(m => m.status === 'completed').length;
-    const totalMatches = matches.length;
+
+    // For elimination, exclude BYE matches from progress
+    const realMatches = activeSelective?.mode === 'elimination'
+        ? matches.filter(m => m.player1Id && m.player2Id)
+        : matches;
+    const completedCount = realMatches.filter(m => m.status === 'completed').length;
+    const totalMatches = realMatches.length;
     const progress = totalMatches > 0 ? Math.round((completedCount / totalMatches) * 100) : 0;
 
     const canComplete = completedCount === totalMatches && totalMatches > 0;
@@ -318,53 +371,76 @@ export default function Matches() {
                     {isElimination ? (
                         // Bracket View for Elimination
                         <div className="bracket-container">
-                            {Object.entries(rounds).map(([roundNum, roundMatches]) => (
-                                <div key={roundNum} className="bracket-round">
-                                    <div className="bracket-round-title">
-                                        {Object.keys(rounds).length === parseInt(roundNum) ? 'Final' :
-                                            parseInt(roundNum) === Object.keys(rounds).length - 1 ? 'Semifinal' :
-                                                `Rodada ${roundNum}`}
-                                    </div>
-                                    {roundMatches.map(match => {
-                                        const p1 = playersMap[match.player1Id];
-                                        const p2 = match.player2Id ? playersMap[match.player2Id] : null;
-                                        return (
-                                            <div key={match.id} className="bracket-match">
-                                                <div
-                                                    className={`bracket-player ${match.winnerId === match.player1Id ? 'winner' : ''}`}
-                                                    onClick={() => !loading && p1 && p2 && match.status !== 'completed' && handleSetWinner(match, match.player1Id)}
-                                                >
-                                                    <span className="bracket-player-name">{p1?.name || 'BYE'}</span>
-                                                    <span className="bracket-player-score">
-                                                        {match.winnerId === match.player1Id ? '✓' : match.score1 ?? '-'}
-                                                    </span>
-                                                </div>
-                                                <div
-                                                    className={`bracket-player ${match.winnerId === match.player2Id ? 'winner' : ''}`}
-                                                    onClick={() => !loading && p1 && p2 && match.status !== 'completed' && handleSetWinner(match, match.player2Id)}
-                                                >
-                                                    <span className="bracket-player-name">{p2?.name || 'BYE'}</span>
-                                                    <span className="bracket-player-score">
-                                                        {match.winnerId === match.player2Id ? '✓' : match.score2 ?? '-'}
-                                                    </span>
-                                                </div>
-                                                {match.status === 'completed' && (
-                                                    <div style={{ textAlign: 'center', borderTop: '1px solid var(--border-subtle)' }}>
-                                                        <button
-                                                            className="btn btn-sm"
-                                                            style={{ width: '100%', borderRadius: 0, color: 'var(--red-400)', background: 'rgba(239,68,68,0.06)', fontSize: 11, padding: '6px 0' }}
-                                                            onClick={() => !loading && handleUndoResult(match)}
-                                                            disabled={loading}
-                                                        >
-                                                            <Undo2 size={12} /> Desfazer
-                                                        </button>
+                            {Object.entries(rounds).map(([roundNum, roundMatches]) => {
+                                const totalRoundsCount = Object.keys(rounds).length;
+                                const rn = parseInt(roundNum);
+                                const roundLabel = rn === totalRoundsCount ? '🏆 Final' :
+                                    rn === totalRoundsCount - 1 ? 'Semifinal' :
+                                        rn === totalRoundsCount - 2 && totalRoundsCount > 3 ? 'Quartas de Final' :
+                                            `Rodada ${roundNum}`;
+
+                                // Filter out BYE-only matches (both null or one null + auto-completed)
+                                const visibleMatches = roundMatches.filter(m => {
+                                    // Hide if it's a BYE match (one player is null and it was auto-completed in round 1)
+                                    if (m.round === 1 && (!m.player1Id || !m.player2Id) && m.status === 'completed') return false;
+                                    return true;
+                                });
+
+                                if (visibleMatches.length === 0) return null;
+
+                                return (
+                                    <div key={roundNum} className="bracket-round">
+                                        <div className="bracket-round-title">{roundLabel}</div>
+                                        {visibleMatches.map(match => {
+                                            const p1 = match.player1Id ? playersMap[match.player1Id] : null;
+                                            const p2 = match.player2Id ? playersMap[match.player2Id] : null;
+                                            const bothReady = match.player1Id && match.player2Id;
+                                            const canPlay = bothReady && match.status !== 'completed' && !loading;
+
+                                            return (
+                                                <div key={match.id} className={`bracket-match ${!bothReady ? 'waiting' : ''}`}>
+                                                    <div
+                                                        className={`bracket-player ${match.winnerId === match.player1Id ? 'winner' : ''}`}
+                                                        onClick={() => canPlay && handleSetWinner(match, match.player1Id)}
+                                                        style={{ cursor: canPlay ? 'pointer' : 'default', opacity: !match.player1Id ? 0.4 : 1 }}
+                                                    >
+                                                        <span className="bracket-player-name">
+                                                            {p1?.name || (match.player1Id ? 'Jogador' : 'Aguardando...')}
+                                                        </span>
+                                                        <span className="bracket-player-score">
+                                                            {match.winnerId === match.player1Id ? '✓' : match.player1Id ? (match.score1 ?? '-') : ''}
+                                                        </span>
                                                     </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ))}
+                                                    <div
+                                                        className={`bracket-player ${match.winnerId === match.player2Id ? 'winner' : ''}`}
+                                                        onClick={() => canPlay && handleSetWinner(match, match.player2Id)}
+                                                        style={{ cursor: canPlay ? 'pointer' : 'default', opacity: !match.player2Id ? 0.4 : 1 }}
+                                                    >
+                                                        <span className="bracket-player-name">
+                                                            {p2?.name || (match.player2Id ? 'Jogador' : 'Aguardando...')}
+                                                        </span>
+                                                        <span className="bracket-player-score">
+                                                            {match.winnerId === match.player2Id ? '✓' : match.player2Id ? (match.score2 ?? '-') : ''}
+                                                        </span>
+                                                    </div>
+                                                    {match.status === 'completed' && bothReady && (
+                                                        <div style={{ textAlign: 'center', borderTop: '1px solid var(--border-subtle)' }}>
+                                                            <button
+                                                                className="btn btn-sm"
+                                                                style={{ width: '100%', borderRadius: 0, color: 'var(--red-400)', background: 'rgba(239,68,68,0.06)', fontSize: 11, padding: '6px 0' }}
+                                                                onClick={() => !loading && handleUndoResult(match)}
+                                                                disabled={loading}
+                                                            >
+                                                                <Undo2 size={12} /> Desfazer
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })}
                         </div>
                     ) : (
                         // Grid View for Round-Robin & Swiss

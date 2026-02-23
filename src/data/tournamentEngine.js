@@ -15,7 +15,7 @@ function shuffle(array) {
 }
 
 // ============================================
-// Single Elimination
+// Single Elimination (Full Bracket)
 // ============================================
 export function generateEliminationBracket(selectiveId, playerIds) {
     const shuffled = shuffle(playerIds);
@@ -29,36 +29,70 @@ export function generateEliminationBracket(selectiveId, playerIds) {
         padded.push(null); // BYE
     }
 
-    const matches = [];
     const totalRounds = Math.log2(size);
+    const allMatches = [];
 
-    // Generate first round
+    // ── Round 1: real matchups ──
+    const round1Matches = [];
     for (let i = 0; i < padded.length; i += 2) {
         const p1 = padded[i];
         const p2 = padded[i + 1];
+        const bracketPos = i / 2; // 0, 1, 2, 3...
 
-        if (p1 && p2) {
-            const match = {
-                selectiveId,
-                round: 1,
-                player1Id: p1,
-                player2Id: p2
-            };
-            matches.push(match);
-        } else if (p1) {
-            // BYE - auto advance
-            const match = {
-                selectiveId,
-                round: 1,
-                player1Id: p1,
-                player2Id: null
-            };
-            matches.push(match);
+        const match = {
+            selectiveId,
+            round: 1,
+            bracketPosition: bracketPos,
+            player1Id: p1,
+            player2Id: p2,
+        };
+
+        // BYE: auto-complete, p1 wins by default
+        if (!p2 && p1) {
+            match.status = 'completed';
+            match.winnerId = p1;
+            match.score1 = 1;
+            match.score2 = 0;
+        } else if (!p1 && p2) {
+            match.status = 'completed';
+            match.winnerId = p2;
+            match.score1 = 0;
+            match.score2 = 1;
         }
+
+        round1Matches.push(match);
+    }
+    allMatches.push(...round1Matches);
+
+    // ── Rounds 2+: empty slots, filled by winners ──
+    let prevRoundMatches = round1Matches;
+    for (let round = 2; round <= totalRounds; round++) {
+        const roundMatches = [];
+        for (let i = 0; i < prevRoundMatches.length; i += 2) {
+            const bracketPos = i / 2;
+            const feederA = prevRoundMatches[i];
+            const feederB = prevRoundMatches[i + 1];
+
+            // If a feeder was a BYE (auto-completed), advance the winner
+            const p1 = feederA?.winnerId || null;
+            const p2 = feederB?.winnerId || null;
+
+            const match = {
+                selectiveId,
+                round: round,
+                bracketPosition: bracketPos,
+                player1Id: p1,
+                player2Id: p2,
+            };
+
+            roundMatches.push(match);
+        }
+        allMatches.push(...roundMatches);
+        prevRoundMatches = roundMatches;
     }
 
     return {
-        matches,
+        matches: allMatches,
         totalRounds,
         bracketSize: size
     };
