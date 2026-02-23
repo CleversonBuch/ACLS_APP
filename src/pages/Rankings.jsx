@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { getRankings, getWinRate, getPlayerScore } from '../data/rankingEngine.js';
-import { getSettings, updateSettings } from '../data/db.js';
-import { TrendingUp, TrendingDown, Minus, Settings, Crown, Award, Zap, Trophy, Star, Flame } from 'lucide-react';
+import { getSettings, updateSettings, resetCurrentRanking } from '../data/db.js';
+import { TrendingUp, TrendingDown, Minus, Settings, Crown, Award, Zap, Trophy, Star, Flame, Trash2, AlertTriangle, XCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function Rankings() {
     const [rankings, setRankingsList] = useState([]);
     const [settings, setSettingsState] = useState({ rankingMode: 'points' });
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     useEffect(() => { refresh(); }, []);
 
     function refresh() {
         setRankingsList(getRankings());
         setSettingsState(getSettings());
+    }
+
+    function handleResetRanking() {
+        resetCurrentRanking();
+        setDeleteConfirmOpen(false);
+        refresh();
     }
 
     function toggleMode(mode) {
@@ -89,12 +96,17 @@ export default function Rankings() {
                     </h1>
                     <p className="page-subtitle">{rankings.length} jogadores classificados · {isElo ? 'ELO Rating' : 'Pontos Fixos'}</p>
                 </div>
-                <div className="toggle-group">
-                    <button className={`toggle-option ${!isElo ? 'active' : ''}`} onClick={() => toggleMode('points')}>
-                        Pontos Fixos
-                    </button>
-                    <button className={`toggle-option ${isElo ? 'active' : ''}`} onClick={() => toggleMode('elo')}>
-                        ELO Rating
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+                    <div className="toggle-group">
+                        <button className={`toggle-option ${!isElo ? 'active' : ''}`} onClick={() => toggleMode('points')}>
+                            Pontos Fixos
+                        </button>
+                        <button className={`toggle-option ${isElo ? 'active' : ''}`} onClick={() => toggleMode('elo')}>
+                            ELO Rating
+                        </button>
+                    </div>
+                    <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmOpen(true)}>
+                        <Trash2 size={16} /> Apagar Dados
                     </button>
                 </div>
             </div>
@@ -565,6 +577,38 @@ export default function Rankings() {
                         </span>
                     </div>
                 </>
+            )}
+
+            {/* Modal de Limpeza */}
+            {deleteConfirmOpen && (
+                <div className="modal-overlay" onClick={() => setDeleteConfirmOpen(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+                        <div className="modal-header">
+                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
+                                <AlertTriangle size={20} /> Apagar Ranking
+                            </h3>
+                            <button className="modal-close" onClick={() => setDeleteConfirmOpen(false)}>
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ fontSize: 14, marginBottom: 16, color: 'var(--text-secondary)' }}>
+                                Tem certeza que deseja apagar o progresso do <strong style={{ color: 'var(--text-primary)' }}>Ranking Atual</strong>?
+                            </p>
+                            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, fontSize: 13, color: 'var(--red-400)', marginBottom: 16 }}>
+                                ⚠️ Isto resetará os pontos e ELO de todos os jogadores ativos na temporada (retornando todos a 0 pontos e 1000 ELO). Os jogadores não serão apagados do sistema em si.
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setDeleteConfirmOpen(false)}>
+                                Cancelar
+                            </button>
+                            <button className="btn" style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }} onClick={handleResetRanking}>
+                                🗑️ CONFIRMAR LIMPEZA
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

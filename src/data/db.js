@@ -413,3 +413,20 @@ export function resetHallOfFame() {
     // 3. Clear stage results since they count titles & podiums
     setCollection('stageResults', []);
 }
+
+// ============================================
+// Ranking Geral
+// ============================================
+export function resetCurrentRanking() {
+    // Resets current points, elo, and active season stats without touching Hall of Fame badges or history
+    let players = getPlayers();
+    players = players.map(p => ({
+        ...p,
+        points: 0,
+        eloRating: 1000,
+        wins: 0,
+        losses: 0,
+        streak: 0
+    }));
+    setCollection('players', players);
+}
