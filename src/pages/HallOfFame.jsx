@@ -1,0 +1,257 @@
+import React, { useState, useEffect } from 'react';
+import { getPlayers, getSeasons, getPlayer } from '../data/db.js';
+import { getRankings, getWinRate } from '../data/rankingEngine.js';
+import { Crown, Trophy, Flame, Star, Medal, Award } from 'lucide-react';
+
+export default function HallOfFame() {
+    const [rankings, setRankingsList] = useState([]);
+    const [seasons, setSeasons] = useState([]);
+    const [players, setPlayers] = useState([]);
+
+    useEffect(() => {
+        setRankingsList(getRankings());
+        setSeasons(getSeasons().filter(s => s.status === 'completed').sort((a, b) => b.year - a.year));
+        setPlayers(getPlayers());
+    }, []);
+
+    function getInitials(name) {
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    }
+
+    // All-time stats
+    const topWins = [...players].sort((a, b) => (b.wins || 0) - (a.wins || 0)).slice(0, 5);
+    const topStreak = [...players].sort((a, b) => (b.bestStreak || 0) - (a.bestStreak || 0)).slice(0, 5);
+    const topWinRate = [...players]
+        .filter(p => (p.wins || 0) + (p.losses || 0) >= 3)
+        .sort((a, b) => getWinRate(b) - getWinRate(a))
+        .slice(0, 5);
+
+    const allBadgeHolders = players.filter(p => p.badges && p.badges.length > 0);
+
+    return (
+        <div className="animate-fade-in">
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">🏛️ Hall da Fama</h1>
+                    <p className="page-subtitle">Os maiores feitos da liga</p>
+                </div>
+            </div>
+
+            {/* Champions Timeline */}
+            <div className="card" style={{ marginBottom: 24 }}>
+                <div className="card-header">
+                    <h3 className="card-title">🏆 Campeões por Temporada</h3>
+                </div>
+                {seasons.length > 0 ? (
+                    <div className="champions-timeline">
+                        {seasons.map(season => {
+                            const champ = season.championId ? getPlayer(season.championId) : null;
+                            const vice = season.viceId ? getPlayer(season.viceId) : null;
+                            return (
+                                <div key={season.id} className="timeline-item">
+                                    <div className="timeline-year">Temporada {season.year}</div>
+                                    <div className="timeline-champion">
+                                        {champ ? (
+                                            <span>
+                                                <span style={{ marginRight: 8 }}>👑</span>
+                                                {champ.name}
+                                                {champ.nickname && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>"{champ.nickname}"</span>}
+                                            </span>
+                                        ) : 'Campeão desconhecido'}
+                                    </div>
+                                    {vice && (
+                                        <div className="timeline-vice">
+                                            🥈 Vice: {vice.name}
+                                            {vice.nickname && ` "${vice.nickname}"`}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="empty-state" style={{ padding: 24 }}>
+                        <div className="empty-state-icon">🏆</div>
+                        <div className="empty-state-title">Nenhuma temporada finalizada</div>
+                        <div className="empty-state-desc">Finalize uma temporada no Histórico para ver os campeões aqui</div>
+                    </div>
+                )}
+            </div>
+
+            {/* Records Grid */}
+            <div className="grid-3" style={{ marginBottom: 24 }}>
+                {/* Most Wins */}
+                <div className="card">
+                    <div className="card-header">
+                        <h3 className="card-title">⚔️ Mais Vitórias</h3>
+                    </div>
+                    {topWins.map((p, i) => (
+                        <div key={p.id} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '8px 0',
+                            borderBottom: i < topWins.length - 1 ? '1px solid var(--border-subtle)' : 'none'
+                        }}>
+                            <span style={{
+                                fontFamily: 'var(--font-display)',
+                                fontWeight: 700,
+                                fontSize: 14,
+                                width: 22,
+                                color: i === 0 ? 'var(--gold-400)' : i === 1 ? 'var(--silver)' : i === 2 ? 'var(--bronze)' : 'var(--text-dim)'
+                            }}>
+                                {i + 1}
+                            </span>
+                            <div className="player-avatar-sm" style={{ width: 28, height: 28, fontSize: 11 }}>
+                                {getInitials(p.name)}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name.split(' ')[0]}</div>
+                            </div>
+                            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--green-400)' }}>
+                                {p.wins || 0}
+                            </span>
+                        </div>
+                    ))}
+                    {topWins.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sem dados</div>}
+                </div>
+
+                {/* Best Streak */}
+                <div className="card">
+                    <div className="card-header">
+                        <h3 className="card-title">🔥 Maior Sequência</h3>
+                    </div>
+                    {topStreak.map((p, i) => (
+                        <div key={p.id} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '8px 0',
+                            borderBottom: i < topStreak.length - 1 ? '1px solid var(--border-subtle)' : 'none'
+                        }}>
+                            <span style={{
+                                fontFamily: 'var(--font-display)',
+                                fontWeight: 700,
+                                fontSize: 14,
+                                width: 22,
+                                color: i === 0 ? 'var(--gold-400)' : i === 1 ? 'var(--silver)' : i === 2 ? 'var(--bronze)' : 'var(--text-dim)'
+                            }}>
+                                {i + 1}
+                            </span>
+                            <div className="player-avatar-sm" style={{ width: 28, height: 28, fontSize: 11 }}>
+                                {getInitials(p.name)}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name.split(' ')[0]}</div>
+                            </div>
+                            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--gold-400)' }}>
+                                🔥 {p.bestStreak || 0}
+                            </span>
+                        </div>
+                    ))}
+                    {topStreak.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sem dados</div>}
+                </div>
+
+                {/* Best Win Rate */}
+                <div className="card">
+                    <div className="card-header">
+                        <h3 className="card-title">🎯 Melhor Aproveitamento</h3>
+                    </div>
+                    {topWinRate.map((p, i) => (
+                        <div key={p.id} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '8px 0',
+                            borderBottom: i < topWinRate.length - 1 ? '1px solid var(--border-subtle)' : 'none'
+                        }}>
+                            <span style={{
+                                fontFamily: 'var(--font-display)',
+                                fontWeight: 700,
+                                fontSize: 14,
+                                width: 22,
+                                color: i === 0 ? 'var(--gold-400)' : i === 1 ? 'var(--silver)' : i === 2 ? 'var(--bronze)' : 'var(--text-dim)'
+                            }}>
+                                {i + 1}
+                            </span>
+                            <div className="player-avatar-sm" style={{ width: 28, height: 28, fontSize: 11 }}>
+                                {getInitials(p.name)}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name.split(' ')[0]}</div>
+                            </div>
+                            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--blue-400)' }}>
+                                {getWinRate(p)}%
+                            </span>
+                        </div>
+                    ))}
+                    {topWinRate.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Mín. 3 jogos</div>}
+                </div>
+            </div>
+
+            {/* Badges / Medals */}
+            <div className="card">
+                <div className="card-header">
+                    <h3 className="card-title">🏅 Medalhas e Conquistas</h3>
+                </div>
+                {allBadgeHolders.length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                        {allBadgeHolders.map(p => (
+                            <div key={p.id} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12,
+                                padding: 12,
+                                background: 'var(--bg-deep)',
+                                borderRadius: 'var(--radius-md)'
+                            }}>
+                                <div className="player-avatar-sm">{getInitials(p.name)}</div>
+                                <div>
+                                    <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name.split(' ')[0]}</div>
+                                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                                        {p.badges.map((b, i) => (
+                                            <span key={i} style={{ fontSize: 18 }}>{b}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+                        Nenhuma conquista alcançada ainda. Continue jogando!
+                    </div>
+                )}
+            </div>
+
+            {/* Current Top 3 */}
+            {rankings.length >= 3 && (
+                <div className="card" style={{ marginTop: 24 }}>
+                    <div className="card-header">
+                        <h3 className="card-title">👑 Top 3 Atual</h3>
+                    </div>
+                    <div className="podium">
+                        <div className="podium-place second">
+                            <div className="podium-medal">🥈</div>
+                            <div className="podium-avatar">{getInitials(rankings[1].name)}</div>
+                            <div className="podium-name">{rankings[1].name.split(' ')[0]}</div>
+                            <div className="podium-bar" />
+                        </div>
+                        <div className="podium-place first">
+                            <div className="podium-medal">🥇</div>
+                            <div className="podium-avatar">{getInitials(rankings[0].name)}</div>
+                            <div className="podium-name">{rankings[0].name.split(' ')[0]}</div>
+                            <div className="podium-bar" />
+                        </div>
+                        <div className="podium-place third">
+                            <div className="podium-medal">🥉</div>
+                            <div className="podium-avatar">{getInitials(rankings[2].name)}</div>
+                            <div className="podium-name">{rankings[2].name.split(' ')[0]}</div>
+                            <div className="podium-bar" />
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
