@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { getPlayers, getSeasons, getPlayer } from '../data/db.js';
+import { getPlayers, getSeasons, getPlayer, resetHallOfFame } from '../data/db.js';
 import { getRankings, getWinRate } from '../data/rankingEngine.js';
-import { Crown, Trophy, Flame, Star, Medal, Award } from 'lucide-react';
+import { Crown, Trophy, Flame, Star, Medal, Award, Trash2, AlertTriangle, XCircle } from 'lucide-react';
 
 export default function HallOfFame() {
     const [rankings, setRankingsList] = useState([]);
     const [seasons, setSeasons] = useState([]);
     const [players, setPlayers] = useState([]);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-    useEffect(() => {
+    useEffect(() => { refresh(); }, []);
+
+    function refresh() {
         setRankingsList(getRankings());
         setSeasons(getSeasons().filter(s => s.status === 'completed').sort((a, b) => b.year - a.year));
         setPlayers(getPlayers());
-    }, []);
+    }
+
+    function handleResetHallOfFame() {
+        resetHallOfFame();
+        setDeleteConfirmOpen(false);
+        refresh();
+    }
 
     function getInitials(name) {
         return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -35,6 +44,9 @@ export default function HallOfFame() {
                     <h1 className="page-title">🏛️ Hall da Fama</h1>
                     <p className="page-subtitle">Os maiores feitos da liga</p>
                 </div>
+                <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmOpen(true)}>
+                    <Trash2 size={16} /> Apagar Dados
+                </button>
             </div>
 
             {/* Champions Timeline */}
@@ -248,6 +260,38 @@ export default function HallOfFame() {
                             <div className="podium-avatar">{getInitials(rankings[2].name)}</div>
                             <div className="podium-name">{rankings[2].name.split(' ')[0]}</div>
                             <div className="podium-bar" />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Limpeza */}
+            {deleteConfirmOpen && (
+                <div className="modal-overlay" onClick={() => setDeleteConfirmOpen(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+                        <div className="modal-header">
+                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
+                                <AlertTriangle size={20} /> Apagar Hall da Fama
+                            </h3>
+                            <button className="modal-close" onClick={() => setDeleteConfirmOpen(false)}>
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ fontSize: 14, marginBottom: 16, color: 'var(--text-secondary)' }}>
+                                Tem certeza que deseja apagar os registros do <strong style={{ color: 'var(--text-primary)' }}>Hall da Fama</strong>?
+                            </p>
+                            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, fontSize: 13, color: 'var(--red-400)', marginBottom: 16 }}>
+                                ⚠️ Esta ação redefinirá o total de vitórias, sequências, medalhas de todos e apagará todas as temporadas finalizadas. Isto não apagará os jogadores do ranking ativo de pontos e elo. O processo é irreversível.
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setDeleteConfirmOpen(false)}>
+                                Cancelar
+                            </button>
+                            <button className="btn" style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }} onClick={handleResetHallOfFame}>
+                                🗑️ CONFIRMAR LIMPEZA
+                            </button>
                         </div>
                     </div>
                 </div>

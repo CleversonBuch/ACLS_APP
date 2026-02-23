@@ -386,3 +386,30 @@ export function seedDemoData() {
         updatePlayer(p.id, statsData[i]);
     });
 }
+
+// ============================================
+// Hall of Fame
+// ============================================
+export function resetHallOfFame() {
+    // Hall of Fame data comprises player wins, streak stats, badges, and completed season records.
+    // 1. Reset all player stats that surface in Hall of Fame
+    let players = getPlayers();
+    players = players.map(p => ({
+        ...p,
+        wins: 0,
+        losses: 0,
+        streak: 0,
+        bestStreak: 0,
+        badges: []
+    }));
+    setCollection('players', players);
+
+    // 2. Erase completed seasons entirely (History + Champions Timeline depend on this)
+    const allSeasons = getSeasons();
+    const activeSeason = allSeasons.find(s => s.status === 'active');
+    // Only keeping the active season if there is one
+    setCollection('seasons', activeSeason ? [activeSeason] : []);
+
+    // 3. Clear stage results since they count titles & podiums
+    setCollection('stageResults', []);
+}
