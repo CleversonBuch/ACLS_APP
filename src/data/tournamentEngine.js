@@ -24,47 +24,48 @@ export function generateEliminationBracket(selectiveId, playerIds) {
     let size = 1;
     while (size < shuffled.length) size *= 2;
 
-    const padded = [...shuffled];
-    while (padded.length < size) {
-        padded.push(null); // BYE
-    }
-
     const totalRounds = Math.log2(size);
+    const numByes = size - shuffled.length;
+    const numFirstRoundMatches = size / 2;
     const allMatches = [];
 
-    // ── Round 1: real matchups ──
+    // ── Round 1: distribute BYEs properly ──
+    // First `numByes` matches are BYE matches (player vs null, auto-advance)
+    // Remaining matches are real (player vs player)
     const round1Matches = [];
-    for (let i = 0; i < padded.length; i += 2) {
-        const p1 = padded[i];
-        const p2 = padded[i + 1];
-        const bracketPos = i / 2; // 0, 1, 2, 3...
+    let playerIndex = 0;
 
-        const match = {
-            selectiveId,
-            round: 1,
-            bracketPosition: bracketPos,
-            player1Id: p1,
-            player2Id: p2,
-        };
-
-        // BYE: auto-complete, p1 wins by default
-        if (!p2 && p1) {
-            match.status = 'completed';
-            match.winnerId = p1;
-            match.score1 = 1;
-            match.score2 = 0;
-        } else if (!p1 && p2) {
-            match.status = 'completed';
-            match.winnerId = p2;
-            match.score1 = 0;
-            match.score2 = 1;
+    for (let pos = 0; pos < numFirstRoundMatches; pos++) {
+        if (pos < numByes) {
+            // BYE match: player auto-advances
+            const p1 = shuffled[playerIndex++];
+            round1Matches.push({
+                selectiveId,
+                round: 1,
+                bracketPosition: pos,
+                player1Id: p1,
+                player2Id: null,
+                status: 'completed',
+                winnerId: p1,
+                score1: 1,
+                score2: 0,
+            });
+        } else {
+            // Real match: player vs player
+            const p1 = shuffled[playerIndex++];
+            const p2 = shuffled[playerIndex++];
+            round1Matches.push({
+                selectiveId,
+                round: 1,
+                bracketPosition: pos,
+                player1Id: p1,
+                player2Id: p2,
+            });
         }
-
-        round1Matches.push(match);
     }
     allMatches.push(...round1Matches);
 
-    // ── Rounds 2+: empty slots, filled by winners ──
+    // ── Rounds 2+: empty slots, filled by BYE winners or waiting ──
     let prevRoundMatches = round1Matches;
     for (let round = 2; round <= totalRounds; round++) {
         const roundMatches = [];
