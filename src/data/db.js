@@ -115,7 +115,9 @@ export async function createSelective(data) {
         },
         status: 'active',
         seasonId: data.seasonId || await getCurrentSeasonId(),
-        teamId: data.teamId || 'default'
+        teamId: data.teamId || 'default',
+        teamConfronts: data.teamConfronts || [],
+        teamConfront: data.teamConfront || null
     });
 }
 
