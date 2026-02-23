@@ -1,7 +1,6 @@
 // ============================================
 // LigaPro Sinuca – Tournament Engine
 // ============================================
-import { createMatch } from './db.js';
 
 // ============================================
 // Shuffle Helper
@@ -39,21 +38,21 @@ export function generateEliminationBracket(selectiveId, playerIds) {
         const p2 = padded[i + 1];
 
         if (p1 && p2) {
-            const match = createMatch({
+            const match = {
                 selectiveId,
                 round: 1,
                 player1Id: p1,
                 player2Id: p2
-            });
+            };
             matches.push(match);
         } else if (p1) {
             // BYE - auto advance
-            const match = createMatch({
+            const match = {
                 selectiveId,
                 round: 1,
                 player1Id: p1,
                 player2Id: null
-            });
+            };
             matches.push(match);
         }
     }
@@ -91,12 +90,12 @@ export function generateRoundRobin(selectiveId, playerIds, numRounds = 1) {
                 const p2 = rotatingPlayers[n - 1 - i];
 
                 if (p1 && p2) {
-                    const match = createMatch({
+                    const match = {
                         selectiveId,
                         round: roundNumber,
                         player1Id: p1,
                         player2Id: p2
-                    });
+                    };
                     matches.push(match);
                 }
             }
@@ -143,12 +142,12 @@ export function generateSwissRound(selectiveId, playerIds, rankings, roundNumber
             const prevOpps = playedAgainst[sorted[i]];
             if (prevOpps && prevOpps.has(sorted[j])) continue;
 
-            const match = createMatch({
+            const match = {
                 selectiveId,
                 round: roundNumber,
                 player1Id: sorted[i],
                 player2Id: sorted[j]
-            });
+            };
             matches.push(match);
             matched.add(sorted[i]);
             matched.add(sorted[j]);
@@ -159,12 +158,12 @@ export function generateSwissRound(selectiveId, playerIds, rankings, roundNumber
     // Handle any remaining unmatched players (pair them even if rematch)
     const unmatched = sorted.filter(id => !matched.has(id));
     for (let i = 0; i < unmatched.length - 1; i += 2) {
-        const match = createMatch({
+        const match = {
             selectiveId,
             round: roundNumber,
             player1Id: unmatched[i],
             player2Id: unmatched[i + 1]
-        });
+        };
         matches.push(match);
     }
 

@@ -1,35 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { getSelectives, getPlayer, getPlayers, updateSelective, deleteSelective, updatePlayer } from '../data/db.js';
 import { applyFixedPoints } from '../data/rankingEngine.js';
-import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Swords, Shield } from 'lucide-react';
+import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Swords, Shield, Loader } from 'lucide-react';
 
 export default function Etapas() {
     const [selectives, setSelectives] = useState([]);
     const [activeSelectiveId, setActiveSelectiveId] = useState(null);
+    const [playersMap, setPlayersMap] = useState({});
+    const [loading, setLoading] = useState(true);
     const [refresh, setRefresh] = useState(0);
     const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
     // Etapa 5x5 wizard state
     const [wizardStep, setWizardStep] = useState(0); // 0=hidden, 1=pick players, 2=team name, 3=assign opponents
     const [wizardData, setWizardData] = useState({ selectedPlayers: [], opponentTeam: '', opponents: ['', '', '', '', ''] });
+    const [allPlayersArray, setAllPlayersArray] = useState([]);
 
     useEffect(() => {
-        const all = getSelectives().filter(s => s.eventType === 'etapa');
-        setSelectives(all);
-        const active = all.find(s => s.status === 'active') || all[all.length - 1];
-        if (active) {
-            setActiveSelectiveId(active.id);
-        }
-    }, [refresh]);
+        async function loadData() {
+            setLoading(true);
+            const [allPlayers, allSelectives] = await Promise.all([
+                getPlayers(),
+                getSelectives()
+            ]);
 
-    function handleCompleteSelective() {
+            const map = {};
+            allPlayers.forEach(p => map[p.id] = p);
+            setPlayersMap(map);
+            setAllPlayersArray(allPlayers);
+
+            const etapas = allSelectives.filter(s => s.eventType === 'etapa');
+            setSelectives(etapas);
+
+            let currentId = activeSelectiveId;
+            if (!currentId && etapas.length > 0) {
+                const active = etapas.find(s => s.status === 'active') || etapas[etapas.length - 1];
+                currentId = active.id;
+                setActiveSelectiveId(currentId);
+            }
+            setLoading(false);
+        }
+        loadData();
+    }, [refresh, activeSelectiveId]);
+
+    async function handleCompleteSelective() {
         if (!activeSelectiveId) return;
-        updateSelective(activeSelectiveId, { status: 'completed' });
+        setLoading(true);
+        await updateSelective(activeSelectiveId, { status: 'completed' });
         setRefresh(r => r + 1);
     }
 
-    function handleDeleteSelective() {
+    async function handleDeleteSelective() {
         if (!activeSelectiveId) return;
-        deleteSelective(activeSelectiveId);
+        setLoading(true);
+        await deleteSelective(activeSelectiveId);
         setActiveSelectiveId(null);
         setDeleteConfirmStep(0);
         setRefresh(r => r + 1);
@@ -66,8 +89,17 @@ export default function Etapas() {
     const hasActiveConfront = mappedConfronts.some(c => !c.isFinished);
     const canComplete = isEliminated;
 
+    if (loading && Object.keys(playersMap).length === 0) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-dim)' }}>
+                <Loader className="animate-spin" size={32} style={{ marginBottom: 16 }} />
+                <p>Carregando chaves da etapa...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Etapas</h1>
@@ -75,12 +107,12 @@ export default function Etapas() {
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                     {activeSelective && (
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmStep(1)}>
+                        <button className="btn btn-danger btn-sm" onClick={() => !loading && setDeleteConfirmStep(1)} disabled={loading}>
                             <Trash2 size={16} /> Apagar Etapa
                         </button>
                     )}
                     {isActive && canComplete && (
-                        <button className="btn btn-gold" onClick={handleCompleteSelective}>
+                        <button className="btn btn-gold" onClick={() => !loading && handleCompleteSelective()} disabled={loading}>
                             <CheckCircle size={18} /> Finalizar Etapa
                         </button>
                     )}
@@ -94,7 +126,8 @@ export default function Etapas() {
                         <button
                             key={s.id}
                             className={`season-tab ${activeSelectiveId === s.id ? 'active' : ''}`}
-                            onClick={() => setActiveSelectiveId(s.id)}
+                            onClick={() => !loading && setActiveSelectiveId(s.id)}
+                            disabled={loading}
                         >
                             🏆 {s.name} {s.status === 'completed' ? '✅' : '🔵'}
                         </button>
@@ -177,7 +210,7 @@ export default function Etapas() {
                                 {/* 5 match slots */}
                                 <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                                     {slots.map((slot, idx) => {
-                                        const player = getPlayer(slot.playerId);
+                                        const player = playersMap[slot.playerId];
                                         const isDone = slot.result != null;
                                         const isWin = slot.result === 'win';
                                         return (
@@ -215,15 +248,17 @@ export default function Etapas() {
                                                 {!isDone && isActive && !isFinished ? (
                                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
                                                         <button
-                                                            onClick={() => {
+                                                            disabled={loading}
+                                                            onClick={async () => {
+                                                                setLoading(true);
                                                                 const newSlots = [...slots];
                                                                 newSlots[idx] = { ...newSlots[idx], result: 'win' };
                                                                 const newTeamConfronts = [...workingConfronts];
                                                                 newTeamConfronts[tcIdx] = { ...tc, slots: newSlots };
-                                                                updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
+                                                                await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
 
                                                                 const config = activeSelective?.config || {};
-                                                                applyFixedPoints(slot.playerId, null, config);
+                                                                await applyFixedPoints(slot.playerId, null, config);
                                                                 setRefresh(r => r + 1);
                                                             }}
                                                             style={{
@@ -237,17 +272,19 @@ export default function Etapas() {
                                                             ✅ VITÓRIA
                                                         </button>
                                                         <button
-                                                            onClick={() => {
+                                                            disabled={loading}
+                                                            onClick={async () => {
+                                                                setLoading(true);
                                                                 const newSlots = [...slots];
                                                                 newSlots[idx] = { ...newSlots[idx], result: 'loss' };
                                                                 const newTeamConfronts = [...workingConfronts];
                                                                 newTeamConfronts[tcIdx] = { ...tc, slots: newSlots };
-                                                                updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
+                                                                await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
 
-                                                                const p = getPlayer(slot.playerId);
+                                                                const p = playersMap[slot.playerId];
                                                                 if (p) {
                                                                     const config = activeSelective?.config || {};
-                                                                    updatePlayer(slot.playerId, {
+                                                                    await updatePlayer(slot.playerId, {
                                                                         losses: (p.losses || 0) + 1,
                                                                         points: (p.points || 0) + (config.pointsPerLoss ?? 0),
                                                                         streak: 0
@@ -279,18 +316,20 @@ export default function Etapas() {
                                                         </span>
                                                         {isActive && (
                                                             <button
-                                                                onClick={() => {
-                                                                    const p = getPlayer(slot.playerId);
+                                                                disabled={loading}
+                                                                onClick={async () => {
+                                                                    setLoading(true);
+                                                                    const p = playersMap[slot.playerId];
                                                                     if (p) {
                                                                         const config = activeSelective?.config || {};
                                                                         if (isWin) {
-                                                                            updatePlayer(slot.playerId, {
+                                                                            await updatePlayer(slot.playerId, {
                                                                                 wins: Math.max(0, (p.wins || 0) - 1),
                                                                                 points: Math.max(0, (p.points || 0) - (config.pointsPerWin ?? 3)),
                                                                                 streak: 0
                                                                             });
                                                                         } else {
-                                                                            updatePlayer(slot.playerId, {
+                                                                            await updatePlayer(slot.playerId, {
                                                                                 losses: Math.max(0, (p.losses || 0) - 1),
                                                                                 points: Math.max(0, (p.points || 0) - (config.pointsPerLoss ?? 0))
                                                                             });
@@ -300,7 +339,7 @@ export default function Etapas() {
                                                                     newSlots[idx] = { ...newSlots[idx], result: null };
                                                                     const newTeamConfronts = [...workingConfronts];
                                                                     newTeamConfronts[tcIdx] = { ...tc, slots: newSlots };
-                                                                    updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
+                                                                    await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
 
                                                                     setRefresh(r => r + 1);
                                                                 }}
@@ -325,7 +364,7 @@ export default function Etapas() {
                             <Swords size={40} style={{ color: 'var(--gold-400)', marginBottom: 12 }} />
                             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 8 }}>Novo Confronto</h3>
                             <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>Adicione mais uma equipe adversária à etapa</p>
-                            <button className="btn btn-gold" onClick={() => { setWizardStep(1); setWizardData({ selectedPlayers: [], opponentTeam: '', opponents: ['', '', '', '', ''] }); }}>
+                            <button className="btn btn-gold" onClick={() => { setWizardStep(1); setWizardData({ selectedPlayers: [], opponentTeam: '', opponents: ['', '', '', '', ''] }); }} disabled={loading}>
                                 <Shield size={16} /> Iniciar Configuração
                             </button>
                         </div>
@@ -343,8 +382,7 @@ export default function Etapas() {
                                 }} />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                {/* Let user pick among all players since activeSelective.playerIds is empty for this mode */}
-                                {getPlayers().map(player => {
+                                {allPlayersArray.map(player => {
                                     const pid = player.id;
                                     const p = player;
                                     const selected = wizardData.selectedPlayers.includes(pid);
@@ -457,7 +495,7 @@ export default function Etapas() {
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {wizardData.selectedPlayers.map((pid, idx) => {
-                                    const p = getPlayer(pid);
+                                    const p = playersMap[pid];
                                     return (
                                         <div key={pid} style={{
                                             display: 'flex', alignItems: 'center', gap: 10,
@@ -492,7 +530,9 @@ export default function Etapas() {
                                 <button className="btn btn-secondary" onClick={() => setWizardStep(2)}>← Voltar</button>
                                 <button
                                     className="btn btn-gold"
-                                    onClick={() => {
+                                    disabled={loading}
+                                    onClick={async () => {
+                                        setLoading(true);
                                         const newSlots = wizardData.selectedPlayers.map((pid, i) => ({
                                             playerId: pid,
                                             opponentName: wizardData.opponents[i] || `Jogador ${i + 1}`,
@@ -502,7 +542,7 @@ export default function Etapas() {
                                         const newConfront = { opponentTeam: wizardData.opponentTeam.trim(), slots: newSlots };
                                         const newTeamConfronts = [...workingConfronts, newConfront];
 
-                                        updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
+                                        await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
                                         setWizardStep(0);
                                         setRefresh(r => r + 1);
                                     }}
@@ -515,7 +555,7 @@ export default function Etapas() {
                 </div>
             )}
 
-            {selectives.length === 0 && (
+            {selectives.length === 0 && !loading && (
                 <div className="empty-state">
                     <div className="empty-state-icon">🏆</div>
                     <div className="empty-state-title">Nenhuma etapa oficial iniciada</div>
@@ -525,13 +565,13 @@ export default function Etapas() {
 
             {/* ── Modal Dupla Confirmação para Apagar ── */}
             {deleteConfirmStep > 0 && (
-                <div className="modal-overlay" onClick={() => setDeleteConfirmStep(0)}>
+                <div className="modal-overlay" onClick={() => !loading && setDeleteConfirmStep(0)}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
                         <div className="modal-header">
                             <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
                                 <AlertTriangle size={20} /> Apagar Etapa
                             </h3>
-                            <button className="modal-close" onClick={() => setDeleteConfirmStep(0)}>
+                            <button className="modal-close" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
                                 <XCircle size={20} />
                             </button>
                         </div>
@@ -561,11 +601,11 @@ export default function Etapas() {
                             )}
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setDeleteConfirmStep(0)}>
+                            <button className="btn btn-secondary" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
                                 Cancelar
                             </button>
                             {deleteConfirmStep === 1 && (
-                                <button className="btn btn-danger" onClick={() => setDeleteConfirmStep(2)}>
+                                <button className="btn btn-danger" onClick={() => !loading && setDeleteConfirmStep(2)} disabled={loading}>
                                     Sim, quero apagar
                                 </button>
                             )}
@@ -573,9 +613,10 @@ export default function Etapas() {
                                 <button
                                     className="btn"
                                     style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }}
-                                    onClick={handleDeleteSelective}
+                                    onClick={() => !loading && handleDeleteSelective()}
+                                    disabled={loading}
                                 >
-                                    🗑️ CONFIRMAR EXCLUSÃO
+                                    {loading ? <Loader className="animate-spin" size={16} /> : '🗑️ CONFIRMAR EXCLUSÃO'}
                                 </button>
                             )}
                         </div>

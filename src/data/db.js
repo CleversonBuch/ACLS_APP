@@ -1,21 +1,4 @@
-// ============================================
-// LigaPro Sinuca – localStorage Data Layer
-// ============================================
-
-const STORAGE_PREFIX = 'ligapro_';
-
-function getCollection(name) {
-    try {
-        const data = localStorage.getItem(STORAGE_PREFIX + name);
-        return data ? JSON.parse(data) : [];
-    } catch {
-        return [];
-    }
-}
-
-function setCollection(name, data) {
-    localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(data));
-}
+import { supabase } from '../lib/supabase.js';
 
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -24,55 +7,60 @@ function generateId() {
 // ============================================
 // Generic CRUD
 // ============================================
-export function getAll(collection) {
-    return getCollection(collection);
+export async function getAll(collection) {
+    const { data, error } = await supabase.from(collection).select('*');
+    if (error) { console.error(`Error fetching ${collection}:`, error); return []; }
+    return data || [];
 }
 
-export function getById(collection, id) {
-    return getCollection(collection).find(item => item.id === id) || null;
+export async function getById(collection, id) {
+    const { data, error } = await supabase.from(collection).select('*').eq('id', id).single();
+    if (error) { console.error(`Error fetching ${collection} by id:`, error); return null; }
+    return data;
 }
 
-export function create(collection, item) {
-    const items = getCollection(collection);
+export async function create(collection, item) {
     const newItem = {
         ...item,
-        id: generateId(),
+        id: item.id || generateId(),
         createdAt: new Date().toISOString()
     };
-    items.push(newItem);
-    setCollection(collection, items);
-    return newItem;
+    // Strip undefined
+    Object.keys(newItem).forEach(key => newItem[key] === undefined && delete newItem[key]);
+
+    const { data, error } = await supabase.from(collection).insert([newItem]).select().single();
+    if (error) { console.error(`Error creating in ${collection}:`, error); return null; }
+    return data;
 }
 
-export function update(collection, id, updates) {
-    const items = getCollection(collection);
-    const index = items.findIndex(item => item.id === id);
-    if (index === -1) return null;
-    items[index] = { ...items[index], ...updates, updatedAt: new Date().toISOString() };
-    setCollection(collection, items);
-    return items[index];
+export async function update(collection, id, updates) {
+    const cleanUpdates = { ...updates, updatedAt: new Date().toISOString() };
+    Object.keys(cleanUpdates).forEach(key => cleanUpdates[key] === undefined && delete cleanUpdates[key]);
+
+    const { data, error } = await supabase.from(collection).update(cleanUpdates).eq('id', id).select().single();
+    if (error) { console.error(`Error updating ${collection}:`, error); return null; }
+    return data;
 }
 
-export function remove(collection, id) {
-    const items = getCollection(collection);
-    const filtered = items.filter(item => item.id !== id);
-    setCollection(collection, filtered);
-    return filtered;
+export async function remove(collection, id) {
+    const { data, error } = await supabase.from(collection).delete().eq('id', id).select();
+    if (error) { console.error(`Error deleting from ${collection}:`, error); return null; }
+    return data;
 }
 
 // ============================================
 // Players
 // ============================================
-export function getPlayers() {
-    return getAll('players');
+export async function getPlayers() {
+    return await getAll('players');
 }
 
-export function getPlayer(id) {
-    return getById('players', id);
+export async function getPlayer(id) {
+    return await getById('players', id);
 }
 
-export function createPlayer(data) {
-    return create('players', {
+export async function createPlayer(data) {
+    return await create('players', {
         name: data.name,
         nickname: data.nickname || '',
         photo: data.photo || '',
@@ -87,151 +75,205 @@ export function createPlayer(data) {
     });
 }
 
-export function updatePlayer(id, data) {
-    return update('players', id, data);
+export async function updatePlayer(id, data) {
+    return await update('players', id, data);
 }
 
-export function deletePlayer(id) {
-    return remove('players', id);
+export async function deletePlayer(id) {
+    return await remove('players', id);
 }
 
 // ============================================
-// Selectives (Seletivas)
+// Selectives (Seletivas & Etapas)
 // ============================================
-export function getSelectives() {
-    return getAll('selectives');
+export async function getSelectives() {
+    const seletivas = await getAll('seletivas');
+    const etapas = await getAll('etapas');
+    return [...seletivas, ...etapas];
 }
 
-export function getSelective(id) {
-    return getById('selectives', id);
+export async function getSelective(id) {
+    let sel = await getById('seletivas', id);
+    if (!sel) sel = await getById('etapas', id);
+    return sel;
 }
 
-export function createSelective(data) {
-    return create('selectives', {
+export async function createSelective(data) {
+    const eventType = data.eventType || 'seletiva';
+    const table = eventType === 'etapa' ? 'etapas' : 'seletivas';
+
+    return await create(table, {
         name: data.name,
-        mode: data.mode, // 'elimination', 'round-robin', 'swiss'
-        eventType: data.eventType || 'seletiva', // 'seletiva' | 'etapa'
+        mode: data.mode,
+        eventType: eventType,
         playerIds: data.playerIds || [],
-        config: {
-            rounds: data.config?.rounds || 1,
-            pointsPerWin: data.config?.pointsPerWin ?? 3,
-            pointsPerLoss: data.config?.pointsPerLoss ?? 0,
-            tiebreaker: data.config?.tiebreaker || 'head-to-head'
+        config: data.config || {
+            rounds: 1,
+            pointsPerWin: 3,
+            pointsPerLoss: 0,
+            tiebreaker: 'head-to-head'
         },
-        status: 'active', // 'active', 'completed'
-        seasonId: data.seasonId || getCurrentSeasonId(),
+        status: 'active',
+        seasonId: data.seasonId || await getCurrentSeasonId(),
         teamId: data.teamId || 'default'
     });
 }
 
-export function updateSelective(id, data) {
-    return update('selectives', id, data);
+export async function updateSelective(id, data) {
+    let sel = await getById('seletivas', id);
+    if (sel) {
+        return await update('seletivas', id, data);
+    } else {
+        return await update('etapas', id, data);
+    }
 }
 
-export function deleteSelective(id) {
-    // Remove all matches belonging to this selective
-    const allMatches = getAll('matches');
-    const filtered = allMatches.filter(m => m.selectiveId !== id);
-    setCollection('matches', filtered);
-    // Remove the selective itself
-    return remove('selectives', id);
+export async function deleteSelective(id) {
+    const allMatches = await getAll('matches');
+    const filtered = allMatches.filter(m => m.selectiveId === id);
+    for (const m of filtered) {
+        await remove('matches', m.id);
+    }
+
+    let sel = await getById('seletivas', id);
+    if (sel) {
+        return await remove('seletivas', id);
+    } else {
+        return await remove('etapas', id);
+    }
 }
 
 // ============================================
-// Stage Results (Etapas)
+// Hall Of Fame generic mapper
 // ============================================
-export function saveStageResults(selectiveId, placements) {
-    // placements = [{ playerId, position, points }]
-    return create('stageResults', {
+async function getHallOfFameByType(type) {
+    const { data, error } = await supabase.from('hall_of_fame').select('*').eq('type', type);
+    if (error) { console.error(`Error fetching hall_of_fame type ${type}:`, error); return []; }
+    return data ? data.map(d => ({ id: d.id, ...d.payload })) : [];
+}
+
+async function createHallOfFame(type, payload) {
+    const id = payload.id || generateId();
+    const item = {
+        id,
+        type,
+        payload: payload,
+        createdAt: new Date().toISOString()
+    };
+    const { data, error } = await supabase.from('hall_of_fame').insert([item]).select().single();
+    if (error) { console.error(`Error creating hall_of_fame ${type}:`, error); return null; }
+    return { id: data.id, ...data.payload };
+}
+
+async function updateHallOfFame(type, id, updates) {
+    const { data: existing, error: fetchErr } = await supabase.from('hall_of_fame').select('*').eq('id', id).single();
+    if (fetchErr || !existing) return null;
+
+    const newPayload = { ...existing.payload, ...updates };
+    const { data, error } = await supabase.from('hall_of_fame').update({ payload: newPayload, updatedAt: new Date().toISOString() }).eq('id', id).select().single();
+    if (error) { console.error(`Error updating hall_of_fame ${type}:`, error); return null; }
+    return { id: data.id, ...data.payload };
+}
+
+async function removeHallOfFame(id) {
+    await supabase.from('hall_of_fame').delete().eq('id', id);
+    return [];
+}
+
+// ============================================
+// Stage Results
+// ============================================
+export async function saveStageResults(selectiveId, placements) {
+    return await createHallOfFame('stageResult', {
         selectiveId,
         placements,
         completedAt: new Date().toISOString()
     });
 }
 
-export function getStageResults() {
-    return getAll('stageResults');
+export async function getStageResults() {
+    return await getHallOfFameByType('stageResult');
 }
 
-export function getPlayerStageStats(playerId) {
-    const results = getAll('stageResults');
+export async function getPlayerStageStats(playerId) {
+    const results = await getStageResults();
     let stagesPlayed = 0, titles = 0, podiums = 0;
     const history = [];
 
-    results.forEach(sr => {
+    for (const sr of results) {
         const placement = sr.placements.find(p => p.playerId === playerId);
         if (placement) {
             stagesPlayed++;
             if (placement.position === 1) titles++;
             if (placement.position <= 3) podiums++;
-            // Get selective name
-            const selective = getById('selectives', sr.selectiveId);
+            const selective = await getSelective(sr.selectiveId);
             history.push({
                 name: selective?.name || 'Etapa',
                 position: placement.position,
                 date: sr.completedAt
             });
         }
-    });
-
+    }
     return { stagesPlayed, titles, podiums, history };
 }
 
 // ============================================
 // External Opponents
 // ============================================
-export function getExternalOpponents() {
-    return getAll('externalOpponents');
+export async function getExternalOpponents() {
+    return await getHallOfFameByType('externalOpponent');
 }
 
-export function createExternalOpponent(data) {
-    return create('externalOpponents', {
+export async function createExternalOpponent(data) {
+    return await createHallOfFame('externalOpponent', {
         name: data.name,
         team: data.team || ''
     });
 }
 
-export function getExternalOpponent(id) {
-    return getById('externalOpponents', id);
+export async function getExternalOpponent(id) {
+    const all = await getExternalOpponents();
+    return all.find(o => o.id === id) || null;
 }
 
 // ============================================
-// External Matches (within Etapas)
+// External Matches
 // ============================================
-export function createExternalMatch(data) {
-    return create('externalMatches', {
+export async function createExternalMatch(data) {
+    return await createHallOfFame('externalMatch', {
         selectiveId: data.selectiveId,
-        playerId: data.playerId, // our player
+        playerId: data.playerId,
         externalOpponentId: data.externalOpponentId,
-        result: data.result, // 'win' | 'loss'
+        result: data.result,
         registeredAt: new Date().toISOString()
     });
 }
 
-export function getExternalMatchesBySelective(selectiveId) {
-    return getAll('externalMatches').filter(m => m.selectiveId === selectiveId);
+export async function getExternalMatchesBySelective(selectiveId) {
+    const matches = await getHallOfFameByType('externalMatch');
+    return matches.filter(m => m.selectiveId === selectiveId);
 }
 
-export function getExternalMatchesByPlayer(playerId) {
-    return getAll('externalMatches').filter(m => m.playerId === playerId);
+export async function getExternalMatchesByPlayer(playerId) {
+    const matches = await getHallOfFameByType('externalMatch');
+    return matches.filter(m => m.playerId === playerId);
 }
 
-export function deleteExternalMatch(id) {
-    return remove('externalMatches', id);
+export async function deleteExternalMatch(id) {
+    return await removeHallOfFame(id);
 }
 
-export function getPlayerExternalStats(playerId) {
-    const matches = getExternalMatchesByPlayer(playerId);
+export async function getPlayerExternalStats(playerId) {
+    const matches = await getExternalMatchesByPlayer(playerId);
     const wins = matches.filter(m => m.result === 'win').length;
     const losses = matches.filter(m => m.result === 'loss').length;
     const total = wins + losses;
     const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
 
-    // Group by opponent
     const opponentMap = {};
-    matches.forEach(m => {
+    for (const m of matches) {
         if (!opponentMap[m.externalOpponentId]) {
-            const opp = getExternalOpponent(m.externalOpponentId);
+            const opp = await getExternalOpponent(m.externalOpponentId);
             opponentMap[m.externalOpponentId] = {
                 name: opp?.name || '?',
                 team: opp?.team || '',
@@ -241,50 +283,54 @@ export function getPlayerExternalStats(playerId) {
         }
         if (m.result === 'win') opponentMap[m.externalOpponentId].wins++;
         else opponentMap[m.externalOpponentId].losses++;
-    });
+    }
 
     return { total, wins, losses, winRate, opponents: Object.values(opponentMap) };
 }
+
+// ============================================
 // Matches (Partidas)
 // ============================================
-export function getMatches() {
-    return getAll('matches');
+export async function getMatches() {
+    return await getAll('matches');
 }
 
-export function getMatchesBySelective(selectiveId) {
-    return getAll('matches').filter(m => m.selectiveId === selectiveId);
+export async function getMatchesBySelective(selectiveId) {
+    const matches = await getAll('matches');
+    return matches.filter(m => m.selectiveId === selectiveId);
 }
 
-export function createMatch(data) {
-    return create('matches', {
-        selectiveId: data.selectiveId,
-        round: data.round,
-        player1Id: data.player1Id,
-        player2Id: data.player2Id,
-        score1: null,
-        score2: null,
-        winnerId: null,
-        status: 'pending' // 'pending', 'completed'
+export async function createMatch(data) {
+    return await create('matches', {
+        ...data,
+        status: data.status || 'pending',
+        events: data.events || [],
+        scheduledTime: data.scheduledTime || new Date().toISOString()
     });
 }
 
-export function updateMatch(id, data) {
-    return update('matches', id, data);
+export async function updateMatch(id, data) {
+    return await update('matches', id, data);
 }
 
 // ============================================
-// Seasons (Temporadas)
+// Seasons
 // ============================================
-export function getSeasons() {
-    return getAll('seasons');
+export async function getSeasons() {
+    return await getHallOfFameByType('season');
 }
 
-export function getCurrentSeasonId() {
-    const seasons = getAll('seasons');
+export async function getSeason(id) {
+    const seasons = await getSeasons();
+    return seasons.find(s => s.id === id) || null;
+}
+
+export async function getCurrentSeasonId() {
+    const seasons = await getSeasons();
     const currentYear = new Date().getFullYear();
     let current = seasons.find(s => s.year === currentYear && s.status === 'active');
     if (!current) {
-        current = create('seasons', {
+        current = await createHallOfFame('season', {
             year: currentYear,
             status: 'active',
             championId: null,
@@ -295,16 +341,17 @@ export function getCurrentSeasonId() {
     return current.id;
 }
 
-export function deleteSeason(id) {
-    // Optional: remove related selectives and matches if we want a hard delete
-    const allSelectives = getAll('selectives');
-    const filteredSelectives = allSelectives.filter(s => s.seasonId !== id);
-    setCollection('selectives', filteredSelectives);
-    return remove('seasons', id);
+export async function deleteSeason(id) {
+    const allSelectives = await getSelectives();
+    const filteredSelectives = allSelectives.filter(s => s.seasonId === id);
+    for (const sel of filteredSelectives) {
+        await deleteSelective(sel.id);
+    }
+    return await removeHallOfFame(id);
 }
 
-export function closeSeason(id, championId, viceId, finalRanking) {
-    return update('seasons', id, {
+export async function closeSeason(id, championId, viceId, finalRanking) {
+    return await updateHallOfFame('season', id, {
         status: 'completed',
         championId,
         viceId,
@@ -315,118 +362,99 @@ export function closeSeason(id, championId, viceId, finalRanking) {
 // ============================================
 // Settings
 // ============================================
-export function getSettings() {
-    try {
-        const data = localStorage.getItem(STORAGE_PREFIX + 'settings');
-        return data ? JSON.parse(data) : { rankingMode: 'points' };
-    } catch {
-        return { rankingMode: 'points' };
+export async function getSettings() {
+    const settings = await getHallOfFameByType('setting');
+    if (settings.length > 0) return settings[0];
+    return {
+        rankingMode: 'points',
+        pointsPerWin: 3,
+        pointsPerDraw: 1,
+        initialElo: 1000,
+        eloKFactor: 32
+    };
+}
+
+export async function updateSettings(data) {
+    const settings = await getHallOfFameByType('setting');
+    if (settings.length > 0) {
+        return await updateHallOfFame('setting', settings[0].id, data);
+    } else {
+        return await createHallOfFame('setting', data);
     }
 }
 
-export function updateSettings(updates) {
-    const current = getSettings();
-    const newSettings = { ...current, ...updates };
-    localStorage.setItem(STORAGE_PREFIX + 'settings', JSON.stringify(newSettings));
-    return newSettings;
-}
-
 // ============================================
-// Teams
+// Seeds & Resets
 // ============================================
-export function getTeams() {
-    const teams = getAll('teams');
-    if (teams.length === 0) {
-        create('teams', { name: 'Equipe Principal' });
-        return getAll('teams');
-    }
-    return teams;
-}
+export async function seedDemoData() {
+    const players = await getPlayers();
+    if (players.length > 0) return;
 
-export function createTeam(data) {
-    return create('teams', { name: data.name });
-}
-
-// ============================================
-// Demo / Seed Data
-// ============================================
-export function seedDemoData() {
-    if (getPlayers().length > 0) return; // Already seeded
-
-    const players = [
-        { name: 'Carlos Silva', nickname: 'Tubarão' },
-        { name: 'Roberto Alves', nickname: 'Máquina' },
-        { name: 'André Costa', nickname: 'Sniper' },
-        { name: 'Fernando Lima', nickname: 'Flash' },
-        { name: 'Lucas Mendes', nickname: 'Rei' },
-        { name: 'Paulo Santos', nickname: 'Brabo' },
-        { name: 'João Pereira', nickname: 'Zen' },
-        { name: 'Marcos Oliveira', nickname: 'Trovão' },
-        { name: 'Diego Souza', nickname: 'Artilheiro' },
-        { name: 'Rafael Gomes', nickname: 'Tático' },
+    const names = [
+        "Cleverson", "Lucas M", "Felipe", "Thiago", "Diego R",
+        "Rafael", "Marcelo", "Bruno", "Eduardo", "João Silva"
     ];
 
-    const createdPlayers = players.map(p => createPlayer(p));
+    const createdPlayers = [];
+    for (const name of names) {
+        const p = await createPlayer({ name, nickname: name.substring(0, 3).toUpperCase() });
+        createdPlayers.push(p);
+    }
 
-    // Simulate some stats
     const statsData = [
-        { wins: 18, losses: 4, points: 54, eloRating: 1180, streak: 5, bestStreak: 7, badges: ['🏆', '🔥'] },
-        { wins: 15, losses: 6, points: 45, eloRating: 1140, streak: 3, bestStreak: 5, badges: ['🥈'] },
-        { wins: 14, losses: 7, points: 42, eloRating: 1120, streak: 2, bestStreak: 4, badges: ['🥉'] },
-        { wins: 12, losses: 8, points: 36, eloRating: 1080, streak: 1, bestStreak: 3, badges: [] },
-        { wins: 11, losses: 9, points: 33, eloRating: 1050, streak: 0, bestStreak: 3, badges: [] },
-        { wins: 10, losses: 10, points: 30, eloRating: 1020, streak: 2, bestStreak: 2, badges: [] },
-        { wins: 9, losses: 12, points: 27, eloRating: 990, streak: 0, bestStreak: 2, badges: [] },
+        { wins: 42, losses: 12, points: 126, eloRating: 1450, streak: 5, bestStreak: 8, badges: ['🏆', '🔥'] },
+        { wins: 38, losses: 15, points: 114, eloRating: 1380, streak: 2, bestStreak: 7, badges: ['🥈'] },
+        { wins: 33, losses: 20, points: 99, eloRating: 1310, streak: 0, bestStreak: 5, badges: ['🥉'] },
+        { wins: 28, losses: 20, points: 84, eloRating: 1250, streak: 3, bestStreak: 4, badges: ['🎯'] },
+        { wins: 25, losses: 18, points: 75, eloRating: 1220, streak: 1, bestStreak: 4, badges: [] },
+        { wins: 20, losses: 22, points: 60, eloRating: 1150, streak: 0, bestStreak: 3, badges: [] },
+        { wins: 15, losses: 25, points: 45, eloRating: 1080, streak: 0, bestStreak: 2, badges: [] },
         { wins: 7, losses: 13, points: 21, eloRating: 960, streak: 0, bestStreak: 2, badges: [] },
         { wins: 5, losses: 14, points: 15, eloRating: 930, streak: 1, bestStreak: 1, badges: [] },
         { wins: 4, losses: 17, points: 12, eloRating: 900, streak: 0, bestStreak: 1, badges: [] },
     ];
 
-    createdPlayers.forEach((p, i) => {
-        updatePlayer(p.id, statsData[i]);
-    });
+    for (let i = 0; i < statsData.length; i++) {
+        if (createdPlayers[i]) {
+            await updatePlayer(createdPlayers[i].id, statsData[i]);
+        }
+    }
 }
 
-// ============================================
-// Hall of Fame
-// ============================================
-export function resetHallOfFame() {
-    // Hall of Fame data comprises player wins, streak stats, badges, and completed season records.
-    // 1. Reset all player stats that surface in Hall of Fame
-    let players = getPlayers();
-    players = players.map(p => ({
-        ...p,
-        wins: 0,
-        losses: 0,
-        streak: 0,
-        bestStreak: 0,
-        badges: []
-    }));
-    setCollection('players', players);
+export async function resetHallOfFame() {
+    let players = await getPlayers();
+    for (const p of players) {
+        await updatePlayer(p.id, {
+            wins: 0,
+            losses: 0,
+            streak: 0,
+            bestStreak: 0,
+            badges: []
+        });
+    }
 
-    // 2. Erase completed seasons entirely (History + Champions Timeline depend on this)
-    const allSeasons = getSeasons();
-    const activeSeason = allSeasons.find(s => s.status === 'active');
-    // Only keeping the active season if there is one
-    setCollection('seasons', activeSeason ? [activeSeason] : []);
+    const allSeasons = await getSeasons();
+    for (const s of allSeasons) {
+        if (s.status !== 'active') {
+            await removeHallOfFame(s.id);
+        }
+    }
 
-    // 3. Clear stage results since they count titles & podiums
-    setCollection('stageResults', []);
+    const allStageResults = await getStageResults();
+    for (const sr of allStageResults) {
+        await removeHallOfFame(sr.id);
+    }
 }
 
-// ============================================
-// Ranking Geral
-// ============================================
-export function resetCurrentRanking() {
-    // Resets current points, elo, and active season stats without touching Hall of Fame badges or history
-    let players = getPlayers();
-    players = players.map(p => ({
-        ...p,
-        points: 0,
-        eloRating: 1000,
-        wins: 0,
-        losses: 0,
-        streak: 0
-    }));
-    setCollection('players', players);
+export async function resetCurrentRanking() {
+    let players = await getPlayers();
+    for (const p of players) {
+        await updatePlayer(p.id, {
+            points: 0,
+            eloRating: 1000,
+            wins: 0,
+            losses: 0,
+            streak: 0
+        });
+    }
 }

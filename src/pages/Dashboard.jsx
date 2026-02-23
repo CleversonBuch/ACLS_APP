@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getRankings, getWinRate, getPlayerScore, getGlobalStats } from '../data/rankingEngine.js';
-import { getSelectives, getMatches, getSettings, seedDemoData } from '../data/db.js';
-import { TrendingUp, TrendingDown, Minus, Gamepad2, Flame, Target, Users } from 'lucide-react';
+import { getSelectives, getMatches, getSettings } from '../data/db.js';
+import { TrendingUp, TrendingDown, Minus, Gamepad2, Flame, Target, Users, Loader } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function Dashboard() {
@@ -9,17 +9,25 @@ export default function Dashboard() {
     const [stats, setStats] = useState({});
     const [selectives, setSelectives] = useState([]);
     const [settings, setSettingsState] = useState({ rankingMode: 'points' });
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        seedDemoData();
         refresh();
     }, []);
 
-    function refresh() {
-        setRankings(getRankings());
-        setStats(getGlobalStats());
-        setSelectives(getSelectives());
-        setSettingsState(getSettings());
+    async function refresh() {
+        setLoading(true);
+        const [r, st, sel, set] = await Promise.all([
+            getRankings(),
+            getGlobalStats(),
+            getSelectives(),
+            getSettings()
+        ]);
+        setRankings(r);
+        setStats(st || {});
+        setSelectives(sel);
+        if (set) setSettingsState(set);
+        setLoading(false);
     }
 
     const top3 = rankings.slice(0, 3);
@@ -45,11 +53,21 @@ export default function Dashboard() {
     const lineColors = ['#10b981', '#fbbf24', '#60a5fa', '#f87171', '#a78bfa'];
 
     function getInitials(name) {
+        if (!name) return '';
         return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     }
 
+    if (loading) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-dim)' }}>
+                <Loader className="animate-spin" size={32} style={{ marginBottom: 16 }} />
+                <p>Carregando Dashboard...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Dashboard</h1>

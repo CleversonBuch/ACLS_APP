@@ -9,18 +9,21 @@ export default function CreateEtapa() {
     const [created, setCreated] = useState(false);
 
     useEffect(() => {
-        // Default name
-        const count = getSelectives().filter(s => s.eventType === 'etapa').length + 1;
-        setName(`Etapa #${count}`);
+        async function init() {
+            const selectives = await getSelectives();
+            const count = selectives.filter(s => s.eventType === 'etapa').length + 1;
+            setName(`Etapa #${count}`);
+        }
+        init();
     }, []);
 
-    function handleGenerate() {
+    async function handleGenerate() {
         if (!name.trim()) {
             alert('Dê um nome à Etapa!');
             return;
         }
 
-        const selective = createSelective({
+        const selective = await createSelective({
             name,
             mode: 'team-vs-team', // Or similar dummy identifier since matches are manual
             eventType: 'etapa',

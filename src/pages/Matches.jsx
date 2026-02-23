@@ -1,38 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import { getSelectives, getMatchesBySelective, getPlayer, updateMatch, updateSelective, deleteSelective, saveStageResults, updatePlayer } from '../data/db.js';
-import { applyMatchResult, reverseMatchResult, getHeadToHeadResult, applyFixedPoints } from '../data/rankingEngine.js';
-import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Swords, Trophy, Shield } from 'lucide-react';
+import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSelective, deleteSelective } from '../data/db.js';
+import { applyMatchResult, reverseMatchResult, getHeadToHeadResult } from '../data/rankingEngine.js';
+import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader } from 'lucide-react';
 
 export default function Matches() {
     const [selectives, setSelectives] = useState([]);
     const [activeSelectiveId, setActiveSelectiveId] = useState(null);
     const [matches, setMatches] = useState([]);
+    const [playersMap, setPlayersMap] = useState({});
+    const [loading, setLoading] = useState(true);
     const [refresh, setRefresh] = useState(0);
     const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
-    // Render wizard variables removed since Etapas are decoupled.
 
     useEffect(() => {
-        const all = getSelectives().filter(s => s.eventType !== 'etapa');
-        setSelectives(all);
-        // Default to latest active
-        const active = all.find(s => s.status === 'active') || all[all.length - 1];
-        if (active) {
-            setActiveSelectiveId(active.id);
+        async function loadData() {
+            setLoading(true);
+            const [allPlayers, allSelectives] = await Promise.all([
+                getPlayers(),
+                getSelectives()
+            ]);
+
+            const map = {};
+            allPlayers.forEach(p => map[p.id] = p);
+            setPlayersMap(map);
+
+            const internalSelectives = allSelectives.filter(s => s.eventType !== 'etapa');
+            setSelectives(internalSelectives);
+
+            let currentId = activeSelectiveId;
+            if (!currentId && internalSelectives.length > 0) {
+                const active = internalSelectives.find(s => s.status === 'active') || internalSelectives[internalSelectives.length - 1];
+                currentId = active.id;
+                setActiveSelectiveId(currentId);
+            }
+
+            if (currentId) {
+                const selectiveMatches = await getMatchesBySelective(currentId);
+                setMatches(selectiveMatches);
+            } else {
+                setMatches([]);
+            }
+            setLoading(false);
         }
-    }, [refresh]);
+        loadData();
+    }, [refresh, activeSelectiveId]);
 
-    useEffect(() => {
-        if (activeSelectiveId) {
-            setMatches(getMatchesBySelective(activeSelectiveId));
-        }
-    }, [activeSelectiveId, refresh]);
-
-
-    function handleSetWinner(match, winnerId) {
+    async function handleSetWinner(match, winnerId) {
+        setLoading(true);
         const loserId = winnerId === match.player1Id ? match.player2Id : match.player1Id;
 
         // Update match
-        updateMatch(match.id, {
+        await updateMatch(match.id, {
             winnerId,
             score1: winnerId === match.player1Id ? 1 : 0,
             score2: winnerId === match.player2Id ? 1 : 0,
@@ -41,21 +59,22 @@ export default function Matches() {
 
         // Apply ranking
         const selective = selectives.find(s => s.id === activeSelectiveId);
-        applyMatchResult(winnerId, loserId, selective?.config);
+        await applyMatchResult(winnerId, loserId, selective?.config);
 
         setRefresh(r => r + 1);
     }
 
-    function handleUndoResult(match) {
+    async function handleUndoResult(match) {
         if (!match.winnerId) return;
+        setLoading(true);
         const loserId = match.winnerId === match.player1Id ? match.player2Id : match.player1Id;
         const selective = selectives.find(s => s.id === activeSelectiveId);
 
         // Reverse ranking impact
-        reverseMatchResult(match.winnerId, loserId, selective?.config);
+        await reverseMatchResult(match.winnerId, loserId, selective?.config);
 
         // Reset match to pending
-        updateMatch(match.id, {
+        await updateMatch(match.id, {
             winnerId: null,
             score1: null,
             score2: null,
@@ -65,40 +84,34 @@ export default function Matches() {
         setRefresh(r => r + 1);
     }
 
-    function handleSetScore(matchId, field, value) {
-        updateMatch(matchId, { [field]: parseInt(value) || 0 });
+    async function handleCompleteSelective() {
+        if (!activeSelectiveId) return;
+        setLoading(true);
+        await updateSelective(activeSelectiveId, { status: 'completed' });
         setRefresh(r => r + 1);
     }
 
-    function handleCompleteSelective() {
+    async function handleDeleteSelective() {
         if (!activeSelectiveId) return;
-        const selective = selectives.find(s => s.id === activeSelectiveId);
-
-        // For selectives, we don't save external final placements formally yet, but logic is preserved for future rankings
-        updateSelective(activeSelectiveId, { status: 'completed' });
-        setRefresh(r => r + 1);
-    }
-
-    function handleDeleteSelective() {
-        if (!activeSelectiveId) return;
+        setLoading(true);
         const selective = selectives.find(s => s.id === activeSelectiveId);
 
         // Reverse all completed match rankings for this selective
         const selectiveMatches = matches.filter(m => m.status === 'completed' && m.winnerId);
-        selectiveMatches.forEach(m => {
+        for (const m of selectiveMatches) {
             const loserId = m.winnerId === m.player1Id ? m.player2Id : m.player1Id;
-            reverseMatchResult(m.winnerId, loserId, selective?.config);
-        });
+            await reverseMatchResult(m.winnerId, loserId, selective?.config);
+        }
 
         // Delete selective + its matches
-        deleteSelective(activeSelectiveId);
+        await deleteSelective(activeSelectiveId);
         setActiveSelectiveId(null);
         setDeleteConfirmStep(0);
         setRefresh(r => r + 1);
     }
 
     function getInitials(name) {
-        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        return name ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
     }
 
     const activeSelective = selectives.find(s => s.id === activeSelectiveId);
@@ -124,7 +137,7 @@ export default function Matches() {
         const playerIds = activeSelective.playerIds || [];
         const map = {};
         playerIds.forEach(pid => {
-            const p = getPlayer(pid);
+            const p = playersMap[pid];
             map[pid] = { id: pid, name: p?.name || '?', nickname: p?.nickname || '', wins: 0, losses: 0, points: 0 };
         });
         const completedMatches = matches.filter(m => m.status === 'completed' && m.winnerId);
@@ -155,8 +168,17 @@ export default function Matches() {
         });
     })();
 
+    if (loading && Object.keys(playersMap).length === 0) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-dim)' }}>
+                <Loader className="animate-spin" size={32} style={{ marginBottom: 16 }} />
+                <p>Carregando chaves da seletiva...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Confrontos</h1>
@@ -184,6 +206,7 @@ export default function Matches() {
                             key={s.id}
                             className={`season-tab ${activeSelectiveId === s.id ? 'active' : ''}`}
                             onClick={() => setActiveSelectiveId(s.id)}
+                            disabled={loading}
                         >
                             {s.name} {s.status === 'completed' ? '✅' : '🔵'}
                         </button>
@@ -291,8 +314,6 @@ export default function Matches() {
                         </div>
                     )}
 
-                    {/* ETAPA UI HAS BEEN REMOVED */}
-
                     {/* Matches */}
                     {isElimination ? (
                         // Bracket View for Elimination
@@ -305,13 +326,13 @@ export default function Matches() {
                                                 `Rodada ${roundNum}`}
                                     </div>
                                     {roundMatches.map(match => {
-                                        const p1 = getPlayer(match.player1Id);
-                                        const p2 = match.player2Id ? getPlayer(match.player2Id) : null;
+                                        const p1 = playersMap[match.player1Id];
+                                        const p2 = match.player2Id ? playersMap[match.player2Id] : null;
                                         return (
                                             <div key={match.id} className="bracket-match">
                                                 <div
                                                     className={`bracket-player ${match.winnerId === match.player1Id ? 'winner' : ''}`}
-                                                    onClick={() => p1 && p2 && match.status !== 'completed' && handleSetWinner(match, match.player1Id)}
+                                                    onClick={() => !loading && p1 && p2 && match.status !== 'completed' && handleSetWinner(match, match.player1Id)}
                                                 >
                                                     <span className="bracket-player-name">{p1?.name || 'BYE'}</span>
                                                     <span className="bracket-player-score">
@@ -320,7 +341,7 @@ export default function Matches() {
                                                 </div>
                                                 <div
                                                     className={`bracket-player ${match.winnerId === match.player2Id ? 'winner' : ''}`}
-                                                    onClick={() => p1 && p2 && match.status !== 'completed' && handleSetWinner(match, match.player2Id)}
+                                                    onClick={() => !loading && p1 && p2 && match.status !== 'completed' && handleSetWinner(match, match.player2Id)}
                                                 >
                                                     <span className="bracket-player-name">{p2?.name || 'BYE'}</span>
                                                     <span className="bracket-player-score">
@@ -332,7 +353,8 @@ export default function Matches() {
                                                         <button
                                                             className="btn btn-sm"
                                                             style={{ width: '100%', borderRadius: 0, color: 'var(--red-400)', background: 'rgba(239,68,68,0.06)', fontSize: 11, padding: '6px 0' }}
-                                                            onClick={() => handleUndoResult(match)}
+                                                            onClick={() => !loading && handleUndoResult(match)}
+                                                            disabled={loading}
                                                         >
                                                             <Undo2 size={12} /> Desfazer
                                                         </button>
@@ -361,8 +383,8 @@ export default function Matches() {
                                 </h3>
                                 <div className="matches-grid">
                                     {roundMatches.map(match => {
-                                        const p1 = getPlayer(match.player1Id);
-                                        const p2 = match.player2Id ? getPlayer(match.player2Id) : null;
+                                        const p1 = playersMap[match.player1Id];
+                                        const p2 = match.player2Id ? playersMap[match.player2Id] : null;
                                         const isCompleted = match.status === 'completed';
 
                                         return (
@@ -373,7 +395,7 @@ export default function Matches() {
                                                 <div className="match-versus">
                                                     <div
                                                         className={`match-player ${match.winnerId === match.player1Id ? 'winner' : ''}`}
-                                                        onClick={() => !isCompleted && p1 && p2 && handleSetWinner(match, match.player1Id)}
+                                                        onClick={() => !loading && !isCompleted && p1 && p2 && handleSetWinner(match, match.player1Id)}
                                                     >
                                                         <div className="player-avatar-sm" style={{ margin: '0 auto 6px' }}>
                                                             {p1 ? getInitials(p1.name) : '?'}
@@ -386,7 +408,7 @@ export default function Matches() {
                                                     <div className="match-vs">VS</div>
                                                     <div
                                                         className={`match-player ${match.winnerId === match.player2Id ? 'winner' : ''}`}
-                                                        onClick={() => !isCompleted && p1 && p2 && handleSetWinner(match, match.player2Id)}
+                                                        onClick={() => !loading && !isCompleted && p1 && p2 && handleSetWinner(match, match.player2Id)}
                                                     >
                                                         <div className="player-avatar-sm" style={{ margin: '0 auto 6px' }}>
                                                             {p2 ? getInitials(p2.name) : '?'}
@@ -408,7 +430,8 @@ export default function Matches() {
                                                     <div style={{ textAlign: 'center', marginTop: 12 }}>
                                                         <button
                                                             className="btn btn-danger btn-sm"
-                                                            onClick={() => handleUndoResult(match)}
+                                                            onClick={() => !loading && handleUndoResult(match)}
+                                                            disabled={loading}
                                                         >
                                                             <Undo2 size={14} /> Desfazer Resultado
                                                         </button>
@@ -432,7 +455,7 @@ export default function Matches() {
                 </>
             )}
 
-            {selectives.length === 0 && (
+            {selectives.length === 0 && !loading && (
                 <div className="empty-state">
                     <div className="empty-state-icon">🎱</div>
                     <div className="empty-state-title">Nenhuma seletiva criada</div>
@@ -442,13 +465,13 @@ export default function Matches() {
 
             {/* ── Modal Dupla Confirmação para Apagar ── */}
             {deleteConfirmStep > 0 && (
-                <div className="modal-overlay" onClick={() => setDeleteConfirmStep(0)}>
+                <div className="modal-overlay" onClick={() => !loading && setDeleteConfirmStep(0)}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
                         <div className="modal-header">
                             <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
                                 <AlertTriangle size={20} /> Apagar Seletiva
                             </h3>
-                            <button className="modal-close" onClick={() => setDeleteConfirmStep(0)}>
+                            <button className="modal-close" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
                                 <XCircle size={20} />
                             </button>
                         </div>
@@ -478,11 +501,11 @@ export default function Matches() {
                             )}
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setDeleteConfirmStep(0)}>
+                            <button className="btn btn-secondary" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
                                 Cancelar
                             </button>
                             {deleteConfirmStep === 1 && (
-                                <button className="btn btn-danger" onClick={() => setDeleteConfirmStep(2)}>
+                                <button className="btn btn-danger" onClick={() => !loading && setDeleteConfirmStep(2)} disabled={loading}>
                                     Sim, quero apagar
                                 </button>
                             )}
@@ -490,16 +513,16 @@ export default function Matches() {
                                 <button
                                     className="btn"
                                     style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }}
-                                    onClick={handleDeleteSelective}
+                                    onClick={() => !loading && handleDeleteSelective()}
+                                    disabled={loading}
                                 >
-                                    🗑️ CONFIRMAR EXCLUSÃO
+                                    {loading ? <Loader className="animate-spin" size={16} /> : '🗑️ CONFIRMAR EXCLUSÃO'}
                                 </button>
                             )}
                         </div>
                     </div>
                 </div>
-            )
-            }
-        </div >
+            )}
+        </div>
     );
 }

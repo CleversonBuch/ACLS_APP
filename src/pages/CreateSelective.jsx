@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPlayers, createSelective, getSelectives } from '../data/db.js';
+import { getPlayers, createSelective, getSelectives, createMatch } from '../data/db.js';
 import { generateMatchesForSelective } from '../data/tournamentEngine.js';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Check, Trophy, Flag } from 'lucide-react';
@@ -43,10 +43,13 @@ export default function CreateSelective() {
     const [created, setCreated] = useState(false);
 
     useEffect(() => {
-        setPlayers(getPlayers());
-        // Default name
-        const count = getSelectives().length + 1;
-        setName(`Seletiva #${count}`);
+        async function init() {
+            const p = await getPlayers();
+            setPlayers(p);
+            const s = await getSelectives();
+            setName(`Seletiva #${s.length + 1}`);
+        }
+        init();
     }, []);
 
     // handleEventTypeChange removed.
@@ -66,7 +69,7 @@ export default function CreateSelective() {
         }
     }
 
-    function handleGenerate() {
+    async function handleGenerate() {
         if (selectedPlayers.length < 2) {
             alert('Selecione pelo menos 2 jogadores!');
             return;
@@ -76,7 +79,7 @@ export default function CreateSelective() {
             return;
         }
 
-        const selective = createSelective({
+        const selective = await createSelective({
             name,
             mode,
             eventType,
@@ -84,7 +87,11 @@ export default function CreateSelective() {
             config,
         });
 
-        generateMatchesForSelective(selective);
+        const { matches } = generateMatchesForSelective(selective);
+        for (const match of matches) {
+            await createMatch(match);
+        }
+
         setCreated(true);
 
         setTimeout(() => {

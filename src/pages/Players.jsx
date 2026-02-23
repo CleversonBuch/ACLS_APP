@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { getPlayers, createPlayer, updatePlayer, deletePlayer, getPlayerStageStats, getPlayerExternalStats } from '../data/db.js';
 import { getWinRate, getRankings } from '../data/rankingEngine.js';
-import { UserPlus, X, Edit, Trash2, Search, Upload, Camera } from 'lucide-react';
+import { UserPlus, X, Edit, Trash2, Search, Upload, Camera, Loader } from 'lucide-react';
 
 export default function Players() {
     const [players, setPlayers] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState(null);
     const [search, setSearch] = useState('');
     const [form, setForm] = useState({ name: '', nickname: '', photo: '' });
-    const [photoMode, setPhotoMode] = useState('upload'); // 'upload' | 'url'
+    const [photoMode, setPhotoMode] = useState('upload');
 
     function handleFileUpload(e) {
         const file = e.target.files[0];
@@ -24,7 +25,6 @@ export default function Players() {
         }
         const reader = new FileReader();
         reader.onloadend = () => {
-            // Resize to keep localStorage manageable
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
@@ -44,24 +44,34 @@ export default function Players() {
 
     useEffect(() => { refresh(); }, []);
 
-    function refresh() {
-        const ranked = getRankings();
-        setPlayers(ranked);
+    async function refresh() {
+        setLoading(true);
+        const ranked = await getRankings();
+
+        const enriched = await Promise.all(ranked.map(async p => {
+            const stageStats = await getPlayerStageStats(p.id);
+            const extStats = await getPlayerExternalStats(p.id);
+            return { ...p, stageStats, extStats };
+        }));
+
+        setPlayers(enriched);
+        setLoading(false);
     }
 
-    function handleSubmit(e) {
+    async function handleSubmit(e) {
         e.preventDefault();
         if (!form.name.trim()) return;
 
+        setLoading(true);
         if (editingPlayer) {
-            updatePlayer(editingPlayer.id, form);
+            await updatePlayer(editingPlayer.id, form);
         } else {
-            createPlayer(form);
+            await createPlayer(form);
         }
         setForm({ name: '', nickname: '', photo: '' });
         setEditingPlayer(null);
         setShowModal(false);
-        refresh();
+        await refresh();
     }
 
     function handleEdit(player) {
@@ -70,10 +80,11 @@ export default function Players() {
         setShowModal(true);
     }
 
-    function handleDelete(id) {
+    async function handleDelete(id) {
         if (confirm('Tem certeza que deseja remover este jogador?')) {
-            deletePlayer(id);
-            refresh();
+            setLoading(true);
+            await deletePlayer(id);
+            await refresh();
         }
     }
 
@@ -110,11 +121,16 @@ export default function Players() {
                 />
             </div>
 
-            {/* Players Grid */}
-            {filtered.length > 0 ? (
+            {/* Loading State or Grid */}
+            {loading && players.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '40vh', color: 'var(--text-dim)' }}>
+                    <Loader className="animate-spin" size={32} style={{ marginBottom: 16 }} />
+                    <p>Sincronizando jogadores...</p>
+                </div>
+            ) : filtered.length > 0 ? (
                 <div className="players-grid">
                     {filtered.map((player, index) => (
-                        <div key={player.id} className="player-card animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
+                        <div key={player.id} className="player-card animate-slide-up" style={{ animationDelay: `${index * 50}ms`, opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
                             <div className="player-card-rank">#{index + 1}</div>
                             <div className="player-card-avatar">
                                 {player.photo ? (
@@ -152,70 +168,62 @@ export default function Players() {
                             </div>
 
                             {/* Etapa Stats */}
-                            {(() => {
-                                const stageStats = getPlayerStageStats(player.id);
-                                if (stageStats.stagesPlayed === 0) return null;
-                                return (
-                                    <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        gap: 16,
-                                        marginTop: 12,
-                                        paddingTop: 10,
-                                        borderTop: '1px solid var(--border-subtle)',
-                                        fontSize: 12
-                                    }}>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{stageStats.stagesPlayed}</div>
-                                            <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Etapas</div>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--gold-400)' }}>{stageStats.titles}</div>
-                                            <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>🏆 Títulos</div>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--bronze)' }}>{stageStats.podiums}</div>
-                                            <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>🥇🥈🥉</div>
-                                        </div>
+                            {player.stageStats && player.stageStats.stagesPlayed > 0 && (
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    gap: 16,
+                                    marginTop: 12,
+                                    paddingTop: 10,
+                                    borderTop: '1px solid var(--border-subtle)',
+                                    fontSize: 12
+                                }}>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{player.stageStats.stagesPlayed}</div>
+                                        <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Etapas</div>
                                     </div>
-                                );
-                            })()}
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--gold-400)' }}>{player.stageStats.titles}</div>
+                                        <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>🏆 Títulos</div>
+                                    </div>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--bronze)' }}>{player.stageStats.podiums}</div>
+                                        <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>🥇🥈🥉</div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* External Stats */}
-                            {(() => {
-                                const extStats = getPlayerExternalStats(player.id);
-                                if (extStats.total === 0) return null;
-                                return (
-                                    <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        gap: 16,
-                                        marginTop: 12,
-                                        paddingTop: 10,
-                                        borderTop: '1px solid var(--border-subtle)',
-                                        fontSize: 12
-                                    }}>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{extStats.total}</div>
-                                            <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>⚔️ Externos</div>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--green-400)' }}>{extStats.wins}</div>
-                                            <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>V Ext.</div>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: extStats.winRate >= 50 ? 'var(--green-400)' : 'var(--red-400)' }}>{extStats.winRate}%</div>
-                                            <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Aprov. Ext.</div>
-                                        </div>
+                            {player.extStats && player.extStats.total > 0 && (
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    gap: 16,
+                                    marginTop: 12,
+                                    paddingTop: 10,
+                                    borderTop: '1px solid var(--border-subtle)',
+                                    fontSize: 12
+                                }}>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{player.extStats.total}</div>
+                                        <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>⚔️ Externos</div>
                                     </div>
-                                );
-                            })()}
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--green-400)' }}>{player.extStats.wins}</div>
+                                        <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>V Ext.</div>
+                                    </div>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: player.extStats.winRate >= 50 ? 'var(--green-400)' : 'var(--red-400)' }}>{player.extStats.winRate}%</div>
+                                        <div style={{ color: 'var(--text-dim)', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5 }}>Aprov. Ext.</div>
+                                    </div>
+                                </div>
+                            )}
 
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
-                                <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(player)}>
+                                <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(player)} disabled={loading}>
                                     <Edit size={14} /> Editar
                                 </button>
-                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(player.id)}>
+                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(player.id)} disabled={loading}>
                                     <Trash2 size={14} />
                                 </button>
                             </div>
@@ -236,7 +244,7 @@ export default function Players() {
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 className="modal-title">{editingPlayer ? 'Editar Jogador' : 'Novo Jogador'}</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}>
+                            <button className="modal-close" onClick={() => setShowModal(false)} disabled={loading}>
                                 <X size={20} />
                             </button>
                         </div>
@@ -250,6 +258,7 @@ export default function Players() {
                                         value={form.name}
                                         onChange={e => setForm({ ...form, name: e.target.value })}
                                         required
+                                        disabled={loading}
                                     />
                                 </div>
                                 <div className="form-group">
@@ -259,6 +268,7 @@ export default function Players() {
                                         placeholder="Ex: Tubarão"
                                         value={form.nickname}
                                         onChange={e => setForm({ ...form, nickname: e.target.value })}
+                                        disabled={loading}
                                     />
                                 </div>
                                 <div className="form-group">
@@ -276,13 +286,14 @@ export default function Players() {
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 overflow: 'hidden',
-                                                cursor: 'pointer',
+                                                cursor: loading ? 'default' : 'pointer',
                                                 position: 'relative',
                                                 transition: 'border-color 0.2s',
+                                                opacity: loading ? 0.5 : 1
                                             }}
-                                            onClick={() => document.getElementById('photo-file-input').click()}
-                                            onMouseOver={e => e.currentTarget.style.borderColor = 'var(--green-400)'}
-                                            onMouseOut={e => e.currentTarget.style.borderColor = ''}
+                                            onClick={() => !loading && document.getElementById('photo-file-input').click()}
+                                            onMouseOver={e => !loading && (e.currentTarget.style.borderColor = 'var(--green-400)')}
+                                            onMouseOut={e => !loading && (e.currentTarget.style.borderColor = '')}
                                         >
                                             {form.photo ? (
                                                 <img src={form.photo} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -296,12 +307,14 @@ export default function Players() {
                                             accept="image/*"
                                             style={{ display: 'none' }}
                                             onChange={handleFileUpload}
+                                            disabled={loading}
                                         />
                                         <div style={{ display: 'flex', gap: 8 }}>
                                             <button
                                                 type="button"
                                                 className="btn btn-secondary btn-sm"
                                                 onClick={() => document.getElementById('photo-file-input').click()}
+                                                disabled={loading}
                                             >
                                                 <Upload size={14} /> Upload Foto
                                             </button>
@@ -310,6 +323,7 @@ export default function Players() {
                                                     type="button"
                                                     className="btn btn-danger btn-sm"
                                                     onClick={() => setForm({ ...form, photo: '' })}
+                                                    disabled={loading}
                                                 >
                                                     <X size={14} /> Remover
                                                 </button>
@@ -325,11 +339,13 @@ export default function Players() {
                                                 border: 'none',
                                                 color: 'var(--green-400)',
                                                 fontSize: 12,
-                                                cursor: 'pointer',
+                                                cursor: loading ? 'default' : 'pointer',
                                                 textDecoration: 'underline',
                                                 padding: 0,
+                                                opacity: loading ? 0.5 : 1
                                             }}
-                                            onClick={() => setPhotoMode(prev => prev === 'upload' ? 'url' : 'upload')}
+                                            onClick={() => !loading && setPhotoMode(prev => prev === 'upload' ? 'url' : 'upload')}
+                                            disabled={loading}
                                         >
                                             {photoMode === 'upload' ? 'Ou inserir URL da foto' : 'Ou fazer upload do dispositivo'}
                                         </button>
@@ -340,13 +356,16 @@ export default function Players() {
                                             placeholder="https://..."
                                             value={form.photo.startsWith('data:') ? '' : form.photo}
                                             onChange={e => setForm({ ...form, photo: e.target.value })}
+                                            disabled={loading}
                                         />
                                     )}
                                 </div>
                             </div>
                             <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
-                                <button type="submit" className="btn btn-primary">{editingPlayer ? 'Salvar' : 'Adicionar'}</button>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)} disabled={loading}>Cancelar</button>
+                                <button type="submit" className="btn btn-primary" disabled={loading}>
+                                    {loading ? <Loader className="animate-spin" size={16} /> : (editingPlayer ? 'Salvar' : 'Adicionar')}
+                                </button>
                             </div>
                         </form>
                     </div>

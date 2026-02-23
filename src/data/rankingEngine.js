@@ -6,16 +6,17 @@ import { getPlayers, updatePlayer, getSettings, getAll } from './db.js';
 // ============================================
 // Fixed Points Model
 // ============================================
-export function applyFixedPoints(winnerId, loserId, config = {}) {
+export async function applyFixedPoints(winnerId, loserId, config = {}) {
     const pointsPerWin = config.pointsPerWin ?? 3;
     const pointsPerLoss = config.pointsPerLoss ?? 0;
 
-    const winner = getPlayers().find(p => p.id === winnerId);
+    const players = await getPlayers();
+    const winner = players.find(p => p.id === winnerId);
     if (!winner) return;
 
     // Update winner
     const newWinStreak = (winner.streak > 0 ? winner.streak : 0) + 1;
-    updatePlayer(winnerId, {
+    await updatePlayer(winnerId, {
         wins: (winner.wins || 0) + 1,
         points: (winner.points || 0) + pointsPerWin,
         streak: newWinStreak,
@@ -24,9 +25,9 @@ export function applyFixedPoints(winnerId, loserId, config = {}) {
 
     // Update loser (only if internal player)
     if (loserId) {
-        const loser = getPlayers().find(p => p.id === loserId);
+        const loser = players.find(p => p.id === loserId);
         if (loser) {
-            updatePlayer(loserId, {
+            await updatePlayer(loserId, {
                 losses: (loser.losses || 0) + 1,
                 points: (loser.points || 0) + pointsPerLoss,
                 streak: 0
@@ -44,9 +45,10 @@ function expectedScore(ratingA, ratingB) {
     return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
 }
 
-export function applyEloRating(winnerId, loserId) {
-    const winner = getPlayers().find(p => p.id === winnerId);
-    const loser = getPlayers().find(p => p.id === loserId);
+export async function applyEloRating(winnerId, loserId) {
+    const players = await getPlayers();
+    const winner = players.find(p => p.id === winnerId);
+    const loser = players.find(p => p.id === loserId);
     if (!winner || !loser) return;
 
     const winnerRating = winner.eloRating || 1000;
@@ -60,7 +62,7 @@ export function applyEloRating(winnerId, loserId) {
 
     // Update winner
     const newWinStreak = (winner.streak > 0 ? winner.streak : 0) + 1;
-    updatePlayer(winnerId, {
+    await updatePlayer(winnerId, {
         wins: (winner.wins || 0) + 1,
         eloRating: newWinnerRating,
         streak: newWinStreak,
@@ -68,7 +70,7 @@ export function applyEloRating(winnerId, loserId) {
     });
 
     // Update loser
-    updatePlayer(loserId, {
+    await updatePlayer(loserId, {
         losses: (loser.losses || 0) + 1,
         eloRating: Math.max(100, newLoserRating), // Floor at 100
         streak: 0
@@ -78,9 +80,10 @@ export function applyEloRating(winnerId, loserId) {
 // ============================================
 // Apply Match Result (BOTH systems always)
 // ============================================
-export function applyMatchResult(winnerId, loserId, config = {}) {
-    const winner = getPlayers().find(p => p.id === winnerId);
-    const loser = getPlayers().find(p => p.id === loserId);
+export async function applyMatchResult(winnerId, loserId, config = {}) {
+    const players = await getPlayers();
+    const winner = players.find(p => p.id === winnerId);
+    const loser = players.find(p => p.id === loserId);
     if (!winner || !loser) return;
 
     const pointsPerWin = config.pointsPerWin ?? 3;
@@ -96,7 +99,7 @@ export function applyMatchResult(winnerId, loserId, config = {}) {
 
     // Update winner (both systems + stats)
     const newWinStreak = (winner.streak > 0 ? winner.streak : 0) + 1;
-    updatePlayer(winnerId, {
+    await updatePlayer(winnerId, {
         wins: (winner.wins || 0) + 1,
         points: (winner.points || 0) + pointsPerWin,
         eloRating: newWinnerRating,
@@ -105,7 +108,7 @@ export function applyMatchResult(winnerId, loserId, config = {}) {
     });
 
     // Update loser (both systems + stats)
-    updatePlayer(loserId, {
+    await updatePlayer(loserId, {
         losses: (loser.losses || 0) + 1,
         points: (loser.points || 0) + pointsPerLoss,
         eloRating: Math.max(100, newLoserRating),
@@ -116,9 +119,10 @@ export function applyMatchResult(winnerId, loserId, config = {}) {
 // ============================================
 // Reverse Match Result (undo BOTH systems)
 // ============================================
-export function reverseMatchResult(winnerId, loserId, config = {}) {
-    const winner = getPlayers().find(p => p.id === winnerId);
-    const loser = getPlayers().find(p => p.id === loserId);
+export async function reverseMatchResult(winnerId, loserId, config = {}) {
+    const players = await getPlayers();
+    const winner = players.find(p => p.id === winnerId);
+    const loser = players.find(p => p.id === loserId);
     if (!winner || !loser) return;
 
     const pointsPerWin = config.pointsPerWin ?? 3;
@@ -132,7 +136,7 @@ export function reverseMatchResult(winnerId, loserId, config = {}) {
     const loserDelta = Math.round(K_FACTOR * expected);
 
     // Reverse winner (both systems + stats)
-    updatePlayer(winnerId, {
+    await updatePlayer(winnerId, {
         wins: Math.max(0, (winner.wins || 0) - 1),
         points: Math.max(0, (winner.points || 0) - pointsPerWin),
         eloRating: Math.max(100, winnerRating - winnerDelta),
@@ -140,7 +144,7 @@ export function reverseMatchResult(winnerId, loserId, config = {}) {
     });
 
     // Reverse loser (both systems + stats)
-    updatePlayer(loserId, {
+    await updatePlayer(loserId, {
         losses: Math.max(0, (loser.losses || 0) - 1),
         points: Math.max(0, (loser.points || 0) - pointsPerLoss),
         eloRating: loserRating + loserDelta,
@@ -152,10 +156,6 @@ export function reverseMatchResult(winnerId, loserId, config = {}) {
 // Get Sorted Rankings
 // ============================================
 
-/**
- * Check head-to-head between two players across all completed matches.
- * Returns: 1 if playerA won more h2h, -1 if playerB, 0 if tied/no data.
- */
 export function getHeadToHeadResult(playerAId, playerBId, matchList) {
     const h2h = matchList.filter(m =>
         m.status === 'completed' && m.winnerId && (
@@ -171,30 +171,26 @@ export function getHeadToHeadResult(playerAId, playerBId, matchList) {
         else if (m.winnerId === playerBId) bWins++;
     });
 
-    if (aWins > bWins) return 1;   // A wins h2h
-    if (bWins > aWins) return -1;  // B wins h2h
-    return 0; // tied h2h
+    if (aWins > bWins) return 1;
+    if (bWins > aWins) return -1;
+    return 0;
 }
 
-export function getRankings() {
-    const settings = getSettings();
-    const players = getPlayers();
-    const allMatches = getAll('matches');
+export async function getRankings() {
+    const settings = await getSettings();
+    const players = await getPlayers();
+    const allMatches = await getAll('matches');
 
     if (settings.rankingMode === 'elo') {
         return [...players].sort((a, b) => (b.eloRating || 1000) - (a.eloRating || 1000));
     } else {
         return [...players].sort((a, b) => {
-            // 1st: points
             if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
-            // 2nd: head-to-head
             const h2h = getHeadToHeadResult(a.id, b.id, allMatches);
-            if (h2h !== 0) return -h2h; // positive = A wins → A should come first (lower index)
-            // 3rd: win rate
+            if (h2h !== 0) return -h2h;
             const aRate = (a.wins || 0) / Math.max(1, (a.wins || 0) + (a.losses || 0));
             const bRate = (b.wins || 0) / Math.max(1, (b.wins || 0) + (b.losses || 0));
             if (bRate !== aRate) return bRate - aRate;
-            // 4th: more wins
             return (b.wins || 0) - (a.wins || 0);
         });
     }
@@ -212,9 +208,8 @@ export function getWinRate(player) {
 // ============================================
 // Get Player Score (based on mode)
 // ============================================
-export function getPlayerScore(player) {
-    const settings = getSettings();
-    if (settings.rankingMode === 'elo') {
+export function getPlayerScore(player, settings) {
+    if (settings && settings.rankingMode === 'elo') {
         return player.eloRating || 1000;
     }
     return player.points || 0;
@@ -223,8 +218,8 @@ export function getPlayerScore(player) {
 // ============================================
 // Get Global Stats
 // ============================================
-export function getGlobalStats() {
-    const players = getPlayers();
+export async function getGlobalStats() {
+    const players = await getPlayers();
     const totalMatches = players.reduce((sum, p) => sum + (p.wins || 0), 0);
 
     let bestStreak = 0;

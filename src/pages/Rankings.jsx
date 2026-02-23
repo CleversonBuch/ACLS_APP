@@ -1,31 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { getRankings, getWinRate, getPlayerScore } from '../data/rankingEngine.js';
 import { getSettings, updateSettings, resetCurrentRanking } from '../data/db.js';
-import { TrendingUp, TrendingDown, Minus, Settings, Crown, Award, Zap, Trophy, Star, Flame, Trash2, AlertTriangle, XCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Settings, Crown, Award, Zap, Trophy, Star, Flame, Trash2, AlertTriangle, XCircle, Loader } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 export default function Rankings() {
     const [rankings, setRankingsList] = useState([]);
     const [settings, setSettingsState] = useState({ rankingMode: 'points' });
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => { refresh(); }, []);
 
-    function refresh() {
-        setRankingsList(getRankings());
-        setSettingsState(getSettings());
+    async function refresh() {
+        setLoading(true);
+        const [r, s] = await Promise.all([getRankings(), getSettings()]);
+        setRankingsList(r);
+        if (s) setSettingsState(s);
+        setLoading(false);
     }
 
-    function handleResetRanking() {
-        resetCurrentRanking();
+    async function handleResetRanking() {
+        setLoading(true);
+        await resetCurrentRanking();
         setDeleteConfirmOpen(false);
-        refresh();
+        await refresh();
     }
 
-    function toggleMode(mode) {
-        updateSettings({ rankingMode: mode });
-        setSettingsState({ ...settings, rankingMode: mode });
-        setRankingsList(getRankings());
+    async function toggleMode(mode) {
+        setLoading(true);
+        await updateSettings({ rankingMode: mode });
+        setSettingsState(prev => ({ ...prev, rankingMode: mode }));
+        const r = await getRankings();
+        setRankingsList(r);
+        setLoading(false);
     }
 
     const isElo = settings.rankingMode === 'elo';
@@ -111,7 +119,12 @@ export default function Rankings() {
                 </div>
             </div>
 
-            {rankings.length === 0 ? (
+            {loading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '40vh', color: 'var(--text-dim)' }}>
+                    <Loader className="animate-spin" size={32} style={{ marginBottom: 16 }} />
+                    <p>Atualizando ranking da nuvem...</p>
+                </div>
+            ) : rankings.length === 0 ? (
                 <div className="empty-state">
                     <div className="empty-state-icon">🏆</div>
                     <div className="empty-state-title">Sem ranking ainda</div>

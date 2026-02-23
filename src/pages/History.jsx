@@ -1,36 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { getSeasons, getPlayer, closeSeason, getSelectives, deleteSeason } from '../data/db.js';
+import { getSeasons, getPlayers, closeSeason, getSelectives, deleteSeason } from '../data/db.js';
 import { getRankings } from '../data/rankingEngine.js';
-import { Calendar, Trophy, Medal, CheckCircle, Trash2, AlertTriangle, XCircle } from 'lucide-react';
+import { Calendar, Trophy, Medal, CheckCircle, Trash2, AlertTriangle, XCircle, Loader } from 'lucide-react';
 
 export default function History() {
     const [seasons, setSeasons] = useState([]);
     const [activeSeason, setActiveSeason] = useState(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [playersMap, setPlayersMap] = useState({});
+    const [selectives, setSelectivesData] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => { refresh(); }, []);
 
-    function refresh() {
-        const all = getSeasons().sort((a, b) => b.year - a.year);
-        setSeasons(all);
-        if (all.length > 0) {
-            setActiveSeason(all[0]);
+    async function refresh() {
+        setLoading(true);
+        const [allSeasons, allPlayers, allSelectives] = await Promise.all([
+            getSeasons(),
+            getPlayers(),
+            getSelectives()
+        ]);
+
+        allSeasons.sort((a, b) => b.year - a.year);
+        setSeasons(allSeasons);
+        if (allSeasons.length > 0 && !activeSeason) {
+            setActiveSeason(allSeasons[0]);
         }
+
+        const map = {};
+        allPlayers.forEach(p => map[p.id] = p);
+        setPlayersMap(map);
+
+        setSelectivesData(allSelectives);
+        setLoading(false);
     }
 
-    function handleCloseSeason() {
-        if (!activeSeason || activeSeason.status === 'completed') return;
+    // Retain correct active season selection if it changes on load
+    useEffect(() => {
+        if (!activeSeason && seasons.length > 0) {
+            setActiveSeason(seasons[0]);
+        }
+    }, [seasons, activeSeason]);
 
-        const rankings = getRankings();
+    async function handleCloseSeason() {
+        if (!activeSeason || activeSeason.status === 'completed') return;
+        setLoading(true);
+
+        const rankings = await getRankings();
         if (rankings.length < 2) {
             alert('É preciso ter pelo menos 2 jogadores para fechar a temporada.');
+            setLoading(false);
             return;
         }
 
         const champion = rankings[0];
         const vice = rankings[1];
 
-        closeSeason(activeSeason.id, champion.id, vice.id, rankings.map(p => ({
+        await closeSeason(activeSeason.id, champion.id, vice.id, rankings.map(p => ({
             playerId: p.id,
             name: p.name,
             nickname: p.nickname,
@@ -40,34 +66,45 @@ export default function History() {
             losses: p.losses
         })));
 
-        refresh();
+        await refresh();
     }
 
-    function handleDeleteSeason() {
+    async function handleDeleteSeason() {
         if (!activeSeason) return;
-        deleteSeason(activeSeason.id);
+        setLoading(true);
+        await deleteSeason(activeSeason.id);
         setDeleteConfirmOpen(false);
-        refresh();
+        setActiveSeason(null);
+        await refresh();
     }
 
-    const champion = activeSeason?.championId ? getPlayer(activeSeason.championId) : null;
-    const vice = activeSeason?.viceId ? getPlayer(activeSeason.viceId) : null;
+    const champion = activeSeason?.championId ? playersMap[activeSeason.championId] : null;
+    const vice = activeSeason?.viceId ? playersMap[activeSeason.viceId] : null;
     const finalRanking = activeSeason?.finalRanking || [];
-    const seasonSelectives = getSelectives().filter(s => s.seasonId === activeSeason?.id);
+    const seasonSelectives = selectives.filter(s => s.seasonId === activeSeason?.id);
 
     function getInitials(name) {
         return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     }
 
+    if (loading && seasons.length === 0) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-dim)' }}>
+                <Loader className="animate-spin" size={32} style={{ marginBottom: 16 }} />
+                <p>Carregando Histórico de Temporadas...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Histórico</h1>
                     <p className="page-subtitle">Temporadas e resultados anteriores</p>
                 </div>
                 {activeSeason?.status === 'active' && (
-                    <button className="btn btn-gold" onClick={handleCloseSeason}>
+                    <button className="btn btn-gold" onClick={handleCloseSeason} disabled={loading}>
                         <CheckCircle size={18} /> Fechar Temporada {activeSeason.year}
                     </button>
                 )}
@@ -80,7 +117,8 @@ export default function History() {
                         <button
                             key={s.id}
                             className={`season-tab ${activeSeason?.id === s.id ? 'active' : ''}`}
-                            onClick={() => setActiveSeason(s)}
+                            onClick={() => !loading && setActiveSeason(s)}
+                            disabled={loading}
                         >
                             <Calendar size={14} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
                             {s.year}
@@ -106,7 +144,7 @@ export default function History() {
                                     Temporada {activeSeason.year} – {activeSeason.status === 'active' ? 'Em Andamento' : 'Finalizada'}
                                 </span>
                             </div>
-                            <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmOpen(true)}>
+                            <button className="btn btn-danger btn-sm" onClick={() => !loading && setDeleteConfirmOpen(true)} disabled={loading}>
                                 <Trash2 size={16} /> Apagar Temporada
                             </button>
                         </div>
@@ -244,7 +282,7 @@ export default function History() {
                 </div>
             )}
 
-            {seasons.length === 0 && (
+            {seasons.length === 0 && !loading && (
                 <div className="empty-state">
                     <div className="empty-state-icon">📅</div>
                     <div className="empty-state-title">Sem temporadas</div>
@@ -254,13 +292,13 @@ export default function History() {
 
             {/* Delete Season Modal */}
             {deleteConfirmOpen && (
-                <div className="modal-overlay" onClick={() => setDeleteConfirmOpen(false)}>
+                <div className="modal-overlay" onClick={() => !loading && setDeleteConfirmOpen(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
                         <div className="modal-header">
                             <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
                                 <AlertTriangle size={20} /> Apagar Temporada
                             </h3>
-                            <button className="modal-close" onClick={() => setDeleteConfirmOpen(false)}>
+                            <button className="modal-close" onClick={() => !loading && setDeleteConfirmOpen(false)} disabled={loading}>
                                 <XCircle size={20} />
                             </button>
                         </div>
@@ -273,11 +311,11 @@ export default function History() {
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setDeleteConfirmOpen(false)}>
+                            <button className="btn btn-secondary" onClick={() => !loading && setDeleteConfirmOpen(false)} disabled={loading}>
                                 Cancelar
                             </button>
-                            <button className="btn" style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }} onClick={handleDeleteSeason}>
-                                🗑️ CONFIRMAR EXCLUSÃO
+                            <button className="btn" style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }} onClick={handleDeleteSeason} disabled={loading}>
+                                {loading ? <Loader className="animate-spin" size={16} /> : '🗑️ CONFIRMAR EXCLUSÃO'}
                             </button>
                         </div>
                     </div>

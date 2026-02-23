@@ -1,26 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { getPlayers, getSeasons, getPlayer, resetHallOfFame } from '../data/db.js';
 import { getRankings, getWinRate } from '../data/rankingEngine.js';
-import { Crown, Trophy, Flame, Star, Medal, Award, Trash2, AlertTriangle, XCircle } from 'lucide-react';
+import { Crown, Trophy, Flame, Star, Medal, Award, Trash2, AlertTriangle, XCircle, Loader } from 'lucide-react';
 
 export default function HallOfFame() {
     const [rankings, setRankingsList] = useState([]);
     const [seasons, setSeasons] = useState([]);
     const [players, setPlayers] = useState([]);
+    const [playersMap, setPlayersMap] = useState({});
+    const [loading, setLoading] = useState(true);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     useEffect(() => { refresh(); }, []);
 
-    function refresh() {
-        setRankingsList(getRankings());
-        setSeasons(getSeasons().filter(s => s.status === 'completed').sort((a, b) => b.year - a.year));
-        setPlayers(getPlayers());
+    async function refresh() {
+        setLoading(true);
+        const [r, s, p] = await Promise.all([
+            getRankings(),
+            getSeasons(),
+            getPlayers()
+        ]);
+        setRankingsList(r);
+        setSeasons(s.filter(season => season.status === 'completed').sort((a, b) => b.year - a.year));
+        setPlayers(p);
+
+        const map = {};
+        p.forEach(player => map[player.id] = player);
+        setPlayersMap(map);
+
+        setLoading(false);
     }
 
-    function handleResetHallOfFame() {
-        resetHallOfFame();
+    async function handleResetHallOfFame() {
+        setLoading(true);
+        await resetHallOfFame();
         setDeleteConfirmOpen(false);
-        refresh();
+        await refresh();
     }
 
     function getInitials(name) {
@@ -37,8 +52,17 @@ export default function HallOfFame() {
 
     const allBadgeHolders = players.filter(p => p.badges && p.badges.length > 0);
 
+    if (loading && players.length === 0) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-dim)' }}>
+                <Loader className="animate-spin" size={32} style={{ marginBottom: 16 }} />
+                <p>Carregando Hall da Fama...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
             <div className="page-header">
                 <div>
                     <h1 className="page-title">🏛️ Hall da Fama</h1>
@@ -57,8 +81,8 @@ export default function HallOfFame() {
                 {seasons.length > 0 ? (
                     <div className="champions-timeline">
                         {seasons.map(season => {
-                            const champ = season.championId ? getPlayer(season.championId) : null;
-                            const vice = season.viceId ? getPlayer(season.viceId) : null;
+                            const champ = season.championId ? playersMap[season.championId] : null;
+                            const vice = season.viceId ? playersMap[season.viceId] : null;
                             return (
                                 <div key={season.id} className="timeline-item">
                                     <div className="timeline-year">Temporada {season.year}</div>
@@ -289,8 +313,8 @@ export default function HallOfFame() {
                             <button className="btn btn-secondary" onClick={() => setDeleteConfirmOpen(false)}>
                                 Cancelar
                             </button>
-                            <button className="btn" style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }} onClick={handleResetHallOfFame}>
-                                🗑️ CONFIRMAR LIMPEZA
+                            <button className="btn" style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }} onClick={handleResetHallOfFame} disabled={loading}>
+                                {loading ? <Loader className="animate-spin" size={16} /> : '🗑️ CONFIRMAR LIMPEZA'}
                             </button>
                         </div>
                     </div>
