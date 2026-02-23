@@ -69,7 +69,10 @@ export default function CreateSelective() {
         }
     }
 
+    const [loading, setLoading] = useState(false);
+
     async function handleGenerate() {
+        console.log('[handleGenerate] CALLED', { selectedPlayers: selectedPlayers.length, name });
         if (selectedPlayers.length < 2) {
             alert('Selecione pelo menos 2 jogadores!');
             return;
@@ -79,24 +82,45 @@ export default function CreateSelective() {
             return;
         }
 
-        const selective = await createSelective({
-            name,
-            mode,
-            eventType,
-            playerIds: selectedPlayers,
-            config,
-        });
+        setLoading(true);
+        try {
+            console.log('[handleGenerate] Creating selective...');
+            const selective = await createSelective({
+                name,
+                mode,
+                eventType,
+                playerIds: selectedPlayers,
+                config,
+            });
 
-        const { matches } = generateMatchesForSelective(selective);
-        for (const match of matches) {
-            await createMatch(match);
+            console.log('[handleGenerate] createSelective result:', selective);
+
+            if (!selective) {
+                alert('Erro ao criar seletiva. Verifique o console (F12) para detalhes.');
+                setLoading(false);
+                return;
+            }
+
+            console.log('[handleGenerate] Generating matches...');
+            const { matches } = generateMatchesForSelective(selective);
+            console.log('[handleGenerate] Generated', matches.length, 'matches');
+
+            for (const match of matches) {
+                await createMatch(match);
+            }
+            console.log('[handleGenerate] All matches created!');
+
+            setCreated(true);
+
+            setTimeout(() => {
+                navigate('/confrontos');
+            }, 1200);
+        } catch (err) {
+            console.error('[handleGenerate] ERROR:', err);
+            alert('Erro ao criar seletiva: ' + err.message);
+        } finally {
+            setLoading(false);
         }
-
-        setCreated(true);
-
-        setTimeout(() => {
-            navigate('/confrontos');
-        }, 1200);
     }
 
     return (
@@ -242,10 +266,10 @@ export default function CreateSelective() {
                     <button
                         className="btn btn-gold btn-lg btn-block"
                         onClick={handleGenerate}
-                        disabled={selectedPlayers.length < 2}
-                        style={{ opacity: selectedPlayers.length < 2 ? 0.5 : 1 }}
+                        disabled={selectedPlayers.length < 2 || loading}
+                        style={{ opacity: (selectedPlayers.length < 2 || loading) ? 0.5 : 1 }}
                     >
-                        <Zap size={20} /> Gerar Confrontos Automaticamente
+                        <Zap size={20} /> {loading ? 'Criando...' : 'Gerar Confrontos Automaticamente'}
                     </button>
                 </>
             )}

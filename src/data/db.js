@@ -28,8 +28,13 @@ export async function create(collection, item) {
     // Strip undefined
     Object.keys(newItem).forEach(key => newItem[key] === undefined && delete newItem[key]);
 
+    console.log(`[DB] Inserting into '${collection}':`, JSON.stringify(newItem, null, 2));
     const { data, error } = await supabase.from(collection).insert([newItem]).select().single();
-    if (error) { console.error(`Error creating in ${collection}:`, error); return null; }
+    if (error) {
+        console.error(`[DB] ❌ Error creating in ${collection}:`, error.message, error.details, error.hint, error.code);
+        return null;
+    }
+    console.log(`[DB] ✅ Created in '${collection}':`, data?.id);
     return data;
 }
 
@@ -102,7 +107,18 @@ export async function createSelective(data) {
     const eventType = data.eventType || 'seletiva';
     const table = eventType === 'etapa' ? 'etapas' : 'seletivas';
 
-    return await create(table, {
+    console.log(`[createSelective] eventType='${eventType}', table='${table}'`);
+
+    let seasonId;
+    try {
+        seasonId = data.seasonId || await getCurrentSeasonId();
+        console.log(`[createSelective] seasonId='${seasonId}'`);
+    } catch (err) {
+        console.error('[createSelective] ❌ Failed to get seasonId:', err);
+        return null;
+    }
+
+    const payload = {
         name: data.name,
         mode: data.mode,
         eventType: eventType,
@@ -114,11 +130,18 @@ export async function createSelective(data) {
             tiebreaker: 'head-to-head'
         },
         status: 'active',
-        seasonId: data.seasonId || await getCurrentSeasonId(),
-        teamId: data.teamId || 'default',
-        teamConfronts: data.teamConfronts || [],
-        teamConfront: data.teamConfront || null
-    });
+        seasonId: seasonId,
+        teamId: data.teamId || 'default'
+    };
+
+    // Only add team confront fields for etapas (seletivas table doesn't have these columns)
+    if (eventType === 'etapa') {
+        payload.teamConfronts = data.teamConfronts || [];
+        payload.teamConfront = data.teamConfront || null;
+    }
+
+    console.log(`[createSelective] Final payload keys:`, Object.keys(payload));
+    return await create(table, payload);
 }
 
 export async function updateSelective(id, data) {
