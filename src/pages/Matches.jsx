@@ -138,7 +138,7 @@ export default function Matches() {
         const map = {};
         playerIds.forEach(pid => {
             const p = playersMap[pid];
-            map[pid] = { id: pid, name: p?.name || '?', nickname: p?.nickname || '', wins: 0, losses: 0, points: 0 };
+            map[pid] = { id: pid, name: p?.name || '?', nickname: p?.nickname || '', photo: p?.photo || '', wins: 0, losses: 0, points: 0 };
         });
         const completedMatches = matches.filter(m => m.status === 'completed' && m.winnerId);
         completedMatches.forEach(m => {
@@ -277,7 +277,7 @@ export default function Matches() {
                                                     </td>
                                                     <td style={{ background: zoneBg }}>
                                                         <div className="player-cell">
-                                                            <div className="player-avatar-sm">{getInitials(s.name)}</div>
+                                                            <div className="player-avatar-sm" style={{ overflow: 'hidden' }}>{s.photo ? <img src={s.photo} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(s.name)}</div>
                                                             <div>
                                                                 <div className="player-info-name">{s.name}</div>
                                                                 {s.nickname && <div className="player-info-nickname">{s.nickname}</div>}
@@ -397,8 +397,8 @@ export default function Matches() {
                                                         className={`match-player ${match.winnerId === match.player1Id ? 'winner' : ''}`}
                                                         onClick={() => !loading && !isCompleted && p1 && p2 && handleSetWinner(match, match.player1Id)}
                                                     >
-                                                        <div className="player-avatar-sm" style={{ margin: '0 auto 6px' }}>
-                                                            {p1 ? getInitials(p1.name) : '?'}
+                                                        <div className="player-avatar-sm" style={{ margin: '0 auto 6px', overflow: 'hidden' }}>
+                                                            {p1?.photo ? <img src={p1.photo} alt={p1.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (p1 ? getInitials(p1.name) : '?')}
                                                         </div>
                                                         <div className="match-player-name">{p1?.name || 'TBD'}</div>
                                                         {p1?.nickname && (
@@ -410,8 +410,8 @@ export default function Matches() {
                                                         className={`match-player ${match.winnerId === match.player2Id ? 'winner' : ''}`}
                                                         onClick={() => !loading && !isCompleted && p1 && p2 && handleSetWinner(match, match.player2Id)}
                                                     >
-                                                        <div className="player-avatar-sm" style={{ margin: '0 auto 6px' }}>
-                                                            {p2 ? getInitials(p2.name) : '?'}
+                                                        <div className="player-avatar-sm" style={{ margin: '0 auto 6px', overflow: 'hidden' }}>
+                                                            {p2?.photo ? <img src={p2.photo} alt={p2.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (p2 ? getInitials(p2.name) : '?')}
                                                         </div>
                                                         <div className="match-player-name">{p2?.name || 'TBD'}</div>
                                                         {p2?.nickname && (
@@ -443,86 +443,93 @@ export default function Matches() {
                                 </div>
                             </div>
                         ))
-                    )}
+                    )
+                    }
 
-                    {matches.length === 0 && (
-                        <div className="empty-state">
-                            <div className="empty-state-icon">⚔️</div>
-                            <div className="empty-state-title">Sem confrontos</div>
-                            <div className="empty-state-desc">Crie uma seletiva para gerar os confrontos.</div>
-                        </div>
-                    )}
+                    {
+                        matches.length === 0 && (
+                            <div className="empty-state">
+                                <div className="empty-state-icon">⚔️</div>
+                                <div className="empty-state-title">Sem confrontos</div>
+                                <div className="empty-state-desc">Crie uma seletiva para gerar os confrontos.</div>
+                            </div>
+                        )
+                    }
                 </>
             )}
 
-            {selectives.length === 0 && !loading && (
-                <div className="empty-state">
-                    <div className="empty-state-icon">🎱</div>
-                    <div className="empty-state-title">Nenhuma seletiva criada</div>
-                    <div className="empty-state-desc">Vá para "Nova Seletiva" para começar</div>
-                </div>
-            )}
+            {
+                selectives.length === 0 && !loading && (
+                    <div className="empty-state">
+                        <div className="empty-state-icon">🎱</div>
+                        <div className="empty-state-title">Nenhuma seletiva criada</div>
+                        <div className="empty-state-desc">Vá para "Nova Seletiva" para começar</div>
+                    </div>
+                )
+            }
 
             {/* ── Modal Dupla Confirmação para Apagar ── */}
-            {deleteConfirmStep > 0 && (
-                <div className="modal-overlay" onClick={() => !loading && setDeleteConfirmStep(0)}>
-                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
-                        <div className="modal-header">
-                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
-                                <AlertTriangle size={20} /> Apagar Seletiva
-                            </h3>
-                            <button className="modal-close" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
-                                <XCircle size={20} />
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            {deleteConfirmStep === 1 && (
-                                <div>
-                                    <p style={{ fontSize: 14, marginBottom: 16, color: 'var(--text-secondary)' }}>
-                                        Tem certeza que deseja apagar a seletiva <strong style={{ color: 'var(--text-primary)' }}>"{activeSelective?.name}"</strong>?
-                                    </p>
-                                    <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, fontSize: 13, color: 'var(--red-400)' }}>
-                                        ⚠️ Esta ação irá remover <strong>{totalMatches} partidas</strong> e reverter todos os resultados do ranking.
-                                    </div>
-                                </div>
-                            )}
-                            {deleteConfirmStep === 2 && (
-                                <div>
-                                    <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                                        <AlertTriangle size={48} style={{ color: 'var(--red-400)' }} />
-                                    </div>
-                                    <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--red-400)', textAlign: 'center', marginBottom: 8 }}>
-                                        ATENÇÃO: ESTA AÇÃO É IRREVERSÍVEL!
-                                    </p>
-                                    <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
-                                        A seletiva "{activeSelective?.name}" e todas as suas {totalMatches} partidas serão apagadas permanentemente.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
-                                Cancelar
-                            </button>
-                            {deleteConfirmStep === 1 && (
-                                <button className="btn btn-danger" onClick={() => !loading && setDeleteConfirmStep(2)} disabled={loading}>
-                                    Sim, quero apagar
+            {
+                deleteConfirmStep > 0 && (
+                    <div className="modal-overlay" onClick={() => !loading && setDeleteConfirmStep(0)}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+                            <div className="modal-header">
+                                <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
+                                    <AlertTriangle size={20} /> Apagar Seletiva
+                                </h3>
+                                <button className="modal-close" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
+                                    <XCircle size={20} />
                                 </button>
-                            )}
-                            {deleteConfirmStep === 2 && (
-                                <button
-                                    className="btn"
-                                    style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }}
-                                    onClick={() => !loading && handleDeleteSelective()}
-                                    disabled={loading}
-                                >
-                                    {loading ? <Loader className="animate-spin" size={16} /> : '🗑️ CONFIRMAR EXCLUSÃO'}
+                            </div>
+                            <div className="modal-body">
+                                {deleteConfirmStep === 1 && (
+                                    <div>
+                                        <p style={{ fontSize: 14, marginBottom: 16, color: 'var(--text-secondary)' }}>
+                                            Tem certeza que deseja apagar a seletiva <strong style={{ color: 'var(--text-primary)' }}>"{activeSelective?.name}"</strong>?
+                                        </p>
+                                        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, fontSize: 13, color: 'var(--red-400)' }}>
+                                            ⚠️ Esta ação irá remover <strong>{totalMatches} partidas</strong> e reverter todos os resultados do ranking.
+                                        </div>
+                                    </div>
+                                )}
+                                {deleteConfirmStep === 2 && (
+                                    <div>
+                                        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                                            <AlertTriangle size={48} style={{ color: 'var(--red-400)' }} />
+                                        </div>
+                                        <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--red-400)', textAlign: 'center', marginBottom: 8 }}>
+                                            ATENÇÃO: ESTA AÇÃO É IRREVERSÍVEL!
+                                        </p>
+                                        <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
+                                            A seletiva "{activeSelective?.name}" e todas as suas {totalMatches} partidas serão apagadas permanentemente.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button className="btn btn-secondary" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
+                                    Cancelar
                                 </button>
-                            )}
+                                {deleteConfirmStep === 1 && (
+                                    <button className="btn btn-danger" onClick={() => !loading && setDeleteConfirmStep(2)} disabled={loading}>
+                                        Sim, quero apagar
+                                    </button>
+                                )}
+                                {deleteConfirmStep === 2 && (
+                                    <button
+                                        className="btn"
+                                        style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }}
+                                        onClick={() => !loading && handleDeleteSelective()}
+                                        disabled={loading}
+                                    >
+                                        {loading ? <Loader className="animate-spin" size={16} /> : '🗑️ CONFIRMAR EXCLUSÃO'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

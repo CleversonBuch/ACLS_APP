@@ -88,16 +88,23 @@ export default function HallOfFame() {
                                     <div className="timeline-year">Temporada {season.year}</div>
                                     <div className="timeline-champion">
                                         {champ ? (
-                                            <span>
-                                                <span style={{ marginRight: 8 }}>👑</span>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <span>👑</span>
+                                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--gold-400)', overflow: 'hidden', flexShrink: 0 }}>
+                                                    {champ.photo ? <img src={champ.photo} alt={champ.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(champ.name)}
+                                                </div>
                                                 {champ.name}
                                                 {champ.nickname && <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>"{champ.nickname}"</span>}
                                             </span>
                                         ) : 'Campeão desconhecido'}
                                     </div>
                                     {vice && (
-                                        <div className="timeline-vice">
-                                            🥈 Vice: {vice.name}
+                                        <div className="timeline-vice" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            🥈
+                                            <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'var(--silver)', overflow: 'hidden', flexShrink: 0 }}>
+                                                {vice.photo ? <img src={vice.photo} alt={vice.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(vice.name)}
+                                            </div>
+                                            Vice: {vice.name}
                                             {vice.nickname && ` "${vice.nickname}"`}
                                         </div>
                                     )}
@@ -138,8 +145,8 @@ export default function HallOfFame() {
                             }}>
                                 {i + 1}
                             </span>
-                            <div className="player-avatar-sm" style={{ width: 28, height: 28, fontSize: 11 }}>
-                                {getInitials(p.name)}
+                            <div className="player-avatar-sm" style={{ width: 28, height: 28, fontSize: 11, overflow: 'hidden' }}>
+                                {p.photo ? <img src={p.photo} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(p.name)}
                             </div>
                             <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name.split(' ')[0]}</div>
@@ -241,7 +248,7 @@ export default function HallOfFame() {
                                 background: 'var(--bg-deep)',
                                 borderRadius: 'var(--radius-md)'
                             }}>
-                                <div className="player-avatar-sm">{getInitials(p.name)}</div>
+                                <div className="player-avatar-sm" style={{ overflow: 'hidden' }}>{p.photo ? <img src={p.photo} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(p.name)}</div>
                                 <div>
                                     <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name.split(' ')[0]}</div>
                                     <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
@@ -269,19 +276,19 @@ export default function HallOfFame() {
                     <div className="podium">
                         <div className="podium-place second">
                             <div className="podium-medal">🥈</div>
-                            <div className="podium-avatar">{getInitials(rankings[1].name)}</div>
+                            <div className="podium-avatar">{rankings[1].photo ? <img src={rankings[1].photo} alt={rankings[1].name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(rankings[1].name)}</div>
                             <div className="podium-name">{rankings[1].name.split(' ')[0]}</div>
                             <div className="podium-bar" />
                         </div>
                         <div className="podium-place first">
                             <div className="podium-medal">🥇</div>
-                            <div className="podium-avatar">{getInitials(rankings[0].name)}</div>
+                            <div className="podium-avatar">{rankings[0].photo ? <img src={rankings[0].photo} alt={rankings[0].name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(rankings[0].name)}</div>
                             <div className="podium-name">{rankings[0].name.split(' ')[0]}</div>
                             <div className="podium-bar" />
                         </div>
                         <div className="podium-place third">
                             <div className="podium-medal">🥉</div>
-                            <div className="podium-avatar">{getInitials(rankings[2].name)}</div>
+                            <div className="podium-avatar">{rankings[2].photo ? <img src={rankings[2].photo} alt={rankings[2].name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(rankings[2].name)}</div>
                             <div className="podium-name">{rankings[2].name.split(' ')[0]}</div>
                             <div className="podium-bar" />
                         </div>

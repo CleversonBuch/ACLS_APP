@@ -120,7 +120,7 @@ export default function Dashboard() {
                             {/* 2nd place */}
                             <div className="podium-place second">
                                 <div className="podium-medal">🥈</div>
-                                <div className="podium-avatar">{getInitials(top3[1].name)}</div>
+                                <div className="podium-avatar">{top3[1].photo ? <img src={top3[1].photo} alt={top3[1].name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(top3[1].name)}</div>
                                 <div className="podium-name">{top3[1].name.split(' ')[0]}</div>
                                 <div className="podium-nickname">{top3[1].nickname}</div>
                                 <div className="podium-points">{isElo ? top3[1].eloRating : top3[1].points} pts</div>
@@ -129,7 +129,7 @@ export default function Dashboard() {
                             {/* 1st place */}
                             <div className="podium-place first">
                                 <div className="podium-medal">🥇</div>
-                                <div className="podium-avatar">{getInitials(top3[0].name)}</div>
+                                <div className="podium-avatar">{top3[0].photo ? <img src={top3[0].photo} alt={top3[0].name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(top3[0].name)}</div>
                                 <div className="podium-name">{top3[0].name.split(' ')[0]}</div>
                                 <div className="podium-nickname">{top3[0].nickname}</div>
                                 <div className="podium-points">{isElo ? top3[0].eloRating : top3[0].points} pts</div>
@@ -138,7 +138,7 @@ export default function Dashboard() {
                             {/* 3rd place */}
                             <div className="podium-place third">
                                 <div className="podium-medal">🥉</div>
-                                <div className="podium-avatar">{getInitials(top3[2].name)}</div>
+                                <div className="podium-avatar">{top3[2].photo ? <img src={top3[2].photo} alt={top3[2].name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(top3[2].name)}</div>
                                 <div className="podium-name">{top3[2].name.split(' ')[0]}</div>
                                 <div className="podium-nickname">{top3[2].nickname}</div>
                                 <div className="podium-points">{isElo ? top3[2].eloRating : top3[2].points} pts</div>
@@ -265,7 +265,7 @@ export default function Dashboard() {
                                         </td>
                                         <td>
                                             <div className="player-cell">
-                                                <div className="player-avatar-sm">{getInitials(player.name)}</div>
+                                                <div className="player-avatar-sm" style={{ overflow: 'hidden' }}>{player.photo ? <img src={player.photo} alt={player.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(player.name)}</div>
                                                 <div>
                                                     <div className="player-info-name">{player.name}</div>
                                                     <div className="player-info-nickname">{player.nickname}</div>

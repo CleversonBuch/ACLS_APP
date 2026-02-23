@@ -416,8 +416,13 @@ export default function Etapas() {
                                             }}>
                                                 {selected && <CheckCircle size={14} style={{ color: '#fff' }} />}
                                             </div>
-                                            <div style={{ flex: 1, fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
-                                                {p?.name || pid}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', overflow: 'hidden', flexShrink: 0 }}>
+                                                    {p?.photo ? <img src={p.photo} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (p?.name || pid).split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                                                </div>
+                                                <div style={{ flex: 1, fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
+                                                    {p?.name || pid}
+                                                </div>
                                             </div>
                                             {selected && (
                                                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, color: 'var(--green-400)', fontWeight: 700 }}>
@@ -507,6 +512,9 @@ export default function Etapas() {
                                                 fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
                                                 color: 'var(--gold-400)', flexShrink: 0
                                             }}>{idx + 1}</div>
+                                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', overflow: 'hidden', flexShrink: 0 }}>
+                                                {p?.photo ? <img src={p.photo} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (p?.name || pid).split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                                            </div>
                                             <div style={{ flex: 1, fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>
                                                 {p?.name || pid}
                                             </div>
@@ -553,76 +561,81 @@ export default function Etapas() {
                         </div>
                     )}
                 </div>
-            )}
+            )
+            }
 
-            {selectives.length === 0 && !loading && (
-                <div className="empty-state">
-                    <div className="empty-state-icon">🏆</div>
-                    <div className="empty-state-title">Nenhuma etapa oficial iniciada</div>
-                    <div className="empty-state-desc">Vá para o painel de criação para configurar</div>
-                </div>
-            )}
+            {
+                selectives.length === 0 && !loading && (
+                    <div className="empty-state">
+                        <div className="empty-state-icon">🏆</div>
+                        <div className="empty-state-title">Nenhuma etapa oficial iniciada</div>
+                        <div className="empty-state-desc">Vá para o painel de criação para configurar</div>
+                    </div>
+                )
+            }
 
             {/* ── Modal Dupla Confirmação para Apagar ── */}
-            {deleteConfirmStep > 0 && (
-                <div className="modal-overlay" onClick={() => !loading && setDeleteConfirmStep(0)}>
-                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
-                        <div className="modal-header">
-                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
-                                <AlertTriangle size={20} /> Apagar Etapa
-                            </h3>
-                            <button className="modal-close" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
-                                <XCircle size={20} />
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            {deleteConfirmStep === 1 && (
-                                <div>
-                                    <p style={{ fontSize: 14, marginBottom: 16, color: 'var(--text-secondary)' }}>
-                                        Tem certeza que deseja apagar a etapa <strong style={{ color: 'var(--text-primary)' }}>"{activeSelective?.name}"</strong>?
-                                    </p>
-                                    <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, fontSize: 13, color: 'var(--red-400)' }}>
-                                        ⚠️ Esta ação reverterá todos os resultados individuais de ranking obtidos nos confrontos desta etapa.
-                                    </div>
-                                </div>
-                            )}
-                            {deleteConfirmStep === 2 && (
-                                <div>
-                                    <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                                        <AlertTriangle size={48} style={{ color: 'var(--red-400)' }} />
-                                    </div>
-                                    <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--red-400)', textAlign: 'center', marginBottom: 8 }}>
-                                        ATENÇÃO: ESTA AÇÃO É IRREVERSÍVEL!
-                                    </p>
-                                    <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
-                                        A etapa será apagada e as exclusões de ranking se tornarão permanentes.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
-                                Cancelar
-                            </button>
-                            {deleteConfirmStep === 1 && (
-                                <button className="btn btn-danger" onClick={() => !loading && setDeleteConfirmStep(2)} disabled={loading}>
-                                    Sim, quero apagar
+            {
+                deleteConfirmStep > 0 && (
+                    <div className="modal-overlay" onClick={() => !loading && setDeleteConfirmStep(0)}>
+                        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+                            <div className="modal-header">
+                                <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
+                                    <AlertTriangle size={20} /> Apagar Etapa
+                                </h3>
+                                <button className="modal-close" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
+                                    <XCircle size={20} />
                                 </button>
-                            )}
-                            {deleteConfirmStep === 2 && (
-                                <button
-                                    className="btn"
-                                    style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }}
-                                    onClick={() => !loading && handleDeleteSelective()}
-                                    disabled={loading}
-                                >
-                                    {loading ? <Loader className="animate-spin" size={16} /> : '🗑️ CONFIRMAR EXCLUSÃO'}
+                            </div>
+                            <div className="modal-body">
+                                {deleteConfirmStep === 1 && (
+                                    <div>
+                                        <p style={{ fontSize: 14, marginBottom: 16, color: 'var(--text-secondary)' }}>
+                                            Tem certeza que deseja apagar a etapa <strong style={{ color: 'var(--text-primary)' }}>"{activeSelective?.name}"</strong>?
+                                        </p>
+                                        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, fontSize: 13, color: 'var(--red-400)' }}>
+                                            ⚠️ Esta ação reverterá todos os resultados individuais de ranking obtidos nos confrontos desta etapa.
+                                        </div>
+                                    </div>
+                                )}
+                                {deleteConfirmStep === 2 && (
+                                    <div>
+                                        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                                            <AlertTriangle size={48} style={{ color: 'var(--red-400)' }} />
+                                        </div>
+                                        <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--red-400)', textAlign: 'center', marginBottom: 8 }}>
+                                            ATENÇÃO: ESTA AÇÃO É IRREVERSÍVEL!
+                                        </p>
+                                        <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
+                                            A etapa será apagada e as exclusões de ranking se tornarão permanentes.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button className="btn btn-secondary" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
+                                    Cancelar
                                 </button>
-                            )}
+                                {deleteConfirmStep === 1 && (
+                                    <button className="btn btn-danger" onClick={() => !loading && setDeleteConfirmStep(2)} disabled={loading}>
+                                        Sim, quero apagar
+                                    </button>
+                                )}
+                                {deleteConfirmStep === 2 && (
+                                    <button
+                                        className="btn"
+                                        style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }}
+                                        onClick={() => !loading && handleDeleteSelective()}
+                                        disabled={loading}
+                                    >
+                                        {loading ? <Loader className="animate-spin" size={16} /> : '🗑️ CONFIRMAR EXCLUSÃO'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
