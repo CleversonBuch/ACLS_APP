@@ -59,6 +59,49 @@ export default function Matches() {
         return match.bracketPosition % 2 === 0 ? 'player1Id' : 'player2Id';
     }
 
+    // ── Advance a winner through the bracket, auto-completing BYEs ──
+    async function advanceWinnerInBracket(winnerId, currentMatch, allMatches) {
+        let current = currentMatch;
+        let pId = winnerId;
+
+        while (current) {
+            const nextMatch = findNextRoundMatch(current, allMatches);
+            if (!nextMatch) break; // Finished the bracket
+
+            const slot = getSlotInNextMatch(current);
+            const updates = { [slot]: pId };
+
+            // Check if this nextMatch is a structural BYE (it only has one valid feeder, meaning one slot will always be null)
+            // A structural BYE is one where the other slot is explicitly meant to be null forever.
+            // Wait, we don't have the explicit bracket structure here. 
+            // Instead, we can determine this by checking if the other feeder match exists in allMatches.
+            const otherSlotBracketPos = (current.bracketPosition % 2 === 0) ? current.bracketPosition + 1 : current.bracketPosition - 1;
+            const otherFeederExists = allMatches.some(m => m.round === current.round && m.bracketPosition === otherSlotBracketPos);
+
+            if (!otherFeederExists) {
+                // This nextMatch is a BYE for pId. Auto-advance them!
+                updates.status = 'completed';
+                updates.winnerId = pId;
+                updates.score1 = slot === 'player1Id' ? 1 : 0;
+                updates.score2 = slot === 'player2Id' ? 1 : 0;
+            }
+
+            // Apply updates
+            await updateMatch(nextMatch.id, updates);
+
+            // Update in-memory for the loop
+            Object.assign(nextMatch, updates);
+
+            if (updates.status === 'completed') {
+                // If it auto-completed (BYE), we need to keep cascading to the NEXT round
+                current = nextMatch;
+            } else {
+                // Stopped at a real match waiting for an opponent
+                break;
+            }
+        }
+    }
+
     async function handleSetWinner(match, winnerId) {
         setLoading(true);
         const loserId = winnerId === match.player1Id ? match.player2Id : match.player1Id;
@@ -80,11 +123,7 @@ export default function Matches() {
         // ── Elimination auto-advance ──
         if (selective?.mode === 'elimination' && match.bracketPosition != null) {
             const allMatches = await getMatchesBySelective(activeSelectiveId);
-            const nextMatch = findNextRoundMatch(match, allMatches);
-            if (nextMatch) {
-                const slot = getSlotInNextMatch(match);
-                await updateMatch(nextMatch.id, { [slot]: winnerId });
-            }
+            await advanceWinnerInBracket(winnerId, match, allMatches);
         }
 
         // ── Swiss auto-generate next round ──
@@ -139,7 +178,13 @@ export default function Matches() {
         if (selective?.mode === 'elimination' && match.bracketPosition != null) {
             const allMatches = await getMatchesBySelective(activeSelectiveId);
             const nextMatch = findNextRoundMatch(match, allMatches);
-            if (nextMatch && nextMatch.status === 'completed') {
+
+            // Allow undo if the next match is completed ONLY IF it was an auto-completed BYE
+            const otherSlotBracketPos = (match.bracketPosition % 2 === 0) ? match.bracketPosition + 1 : match.bracketPosition - 1;
+            const otherFeederExists = allMatches.some(m => m.round === match.round && m.bracketPosition === otherSlotBracketPos);
+            const isNextMatchStructuralBye = !otherFeederExists;
+
+            if (nextMatch && nextMatch.status === 'completed' && !isNextMatchStructuralBye) {
                 alert('Não é possível desfazer: a próxima partida do bracket já foi jogada. Desfaça ela primeiro.');
                 return;
             }
@@ -161,13 +206,38 @@ export default function Matches() {
             status: 'pending'
         });
 
-        // ── Elimination: remove winner from next match ──
+        // ── Elimination: cascade undo ──
         if (selective?.mode === 'elimination' && match.bracketPosition != null) {
             const allMatches = await getMatchesBySelective(activeSelectiveId);
-            const nextMatch = findNextRoundMatch(match, allMatches);
-            if (nextMatch) {
-                const slot = getSlotInNextMatch(match);
-                await updateMatch(nextMatch.id, { [slot]: null });
+            let current = match;
+
+            while (current) {
+                const nextMatch = findNextRoundMatch(current, allMatches);
+                if (!nextMatch) break;
+
+                const slot = getSlotInNextMatch(current);
+                const updates = { [slot]: null };
+
+                const otherSlotBracketPos = (current.bracketPosition % 2 === 0) ? current.bracketPosition + 1 : current.bracketPosition - 1;
+                const otherFeederExists = allMatches.some(m => m.round === current.round && m.bracketPosition === otherSlotBracketPos);
+                const isNextMatchStructuralBye = !otherFeederExists;
+
+                if (isNextMatchStructuralBye) {
+                    // Reset its completed state too
+                    updates.status = 'pending';
+                    updates.winnerId = null;
+                    updates.score1 = null;
+                    updates.score2 = null;
+                }
+
+                await updateMatch(nextMatch.id, updates);
+                Object.assign(nextMatch, updates);
+
+                if (isNextMatchStructuralBye) {
+                    current = nextMatch; // Keep going up the tree undoing the BYE cascade
+                } else {
+                    break;
+                }
             }
         }
 
@@ -453,8 +523,13 @@ export default function Matches() {
                                             const bothReady = match.player1Id && match.player2Id;
                                             const canPlay = bothReady && match.status !== 'completed' && !loading;
 
-                                            // Verify if it's a structural BYE (Round 1 auto-completed with a null player)
-                                            const isByeMatch = match.round === 1 && (!match.player1Id || !match.player2Id) && match.status === 'completed';
+                                            // Verify if it's a structural BYE (Round 1 or later auto-completed with a null player)
+                                            // Since we auto-complete structural byes immediately, checking for status === 'completed', 
+                                            // and possessing exactly one player at the time is a good heuristic.
+                                            // BUT wait, p1 and p2 might just not be ready yet. A true structural bye means one specific slot will NEVER be filled.
+                                            // The safest way is to check the feeder matches to see if the other slot even exists...
+                                            // But for rendering, checking if one player is null and it's already 'completed' works because normal unfinished matches are 'pending'.
+                                            const isByeMatch = (!match.player1Id || !match.player2Id) && match.status === 'completed';
 
                                             return (
                                                 <div key={match.id} className={`bracket-match ${!bothReady && !isByeMatch ? 'waiting' : ''}`}>

@@ -15,76 +15,117 @@ function shuffle(array) {
 }
 
 // ============================================
-// Single Elimination (Full Bracket)
+// Single Elimination (Adaptive Bracket)
 // ============================================
 export function generateEliminationBracket(selectiveId, playerIds) {
     const shuffled = shuffle(playerIds);
+    const n = shuffled.length;
+    if (n === 0) return { matches: [], totalRounds: 0, bracketSize: 0 };
 
-    // Pad to nearest power of 2
-    let size = 1;
-    while (size < shuffled.length) size *= 2;
-
-    const totalRounds = Math.log2(size);
-    const numByes = size - shuffled.length;
-    const numFirstRoundMatches = size / 2;
     const allMatches = [];
 
-    // ── Round 1: distribute BYEs properly ──
-    // First `numByes` matches are BYE matches (player vs null, auto-advance)
-    // Remaining matches are real (player vs player)
+    // We don't pad to a power of 2 anymore. 
+    // Round 1 takes all players. 
+    // Real matches: Math.floor(n / 2)
+    // If n is odd, 1 player gets a BYE in Round 1.
+    const numFirstRoundMatches = Math.floor(n / 2);
+    const hasOddBye = n % 2 !== 0;
+
+    // Calculate total rounds dynamically based on how winners halve
+    let totalRounds = 1;
+    let currentPlayers = n;
+    while (currentPlayers > 1) {
+        currentPlayers = Math.ceil(currentPlayers / 2);
+        if (currentPlayers > 1) totalRounds++;
+    }
+
+    // ── Round 1 ──
     const round1Matches = [];
     let playerIndex = 0;
+    let bracketPos = 0;
 
-    for (let pos = 0; pos < numFirstRoundMatches; pos++) {
-        if (pos < numByes) {
-            // BYE match: player auto-advances
-            const p1 = shuffled[playerIndex++];
-            round1Matches.push({
-                selectiveId,
-                round: 1,
-                bracketPosition: pos,
-                player1Id: p1,
-                player2Id: null,
-                status: 'completed',
-                winnerId: p1,
-                score1: 1,
-                score2: 0,
-            });
-        } else {
-            // Real match: player vs player
-            const p1 = shuffled[playerIndex++];
-            const p2 = shuffled[playerIndex++];
-            round1Matches.push({
-                selectiveId,
-                round: 1,
-                bracketPosition: pos,
-                player1Id: p1,
-                player2Id: p2,
-            });
-        }
+    // Real matches
+    for (let i = 0; i < numFirstRoundMatches; i++) {
+        const p1 = shuffled[playerIndex++];
+        const p2 = shuffled[playerIndex++];
+        round1Matches.push({
+            selectiveId,
+            round: 1,
+            bracketPosition: bracketPos++,
+            player1Id: p1,
+            player2Id: p2,
+        });
+    }
+
+    // The odd man out gets a BYE
+    if (hasOddBye) {
+        const p1 = shuffled[playerIndex++];
+        round1Matches.push({
+            selectiveId,
+            round: 1,
+            bracketPosition: bracketPos++,
+            player1Id: p1,
+            player2Id: null,      // No opponent
+            status: 'completed',  // Auto-completed
+            winnerId: p1,         // Advances automatically
+            score1: 1,
+            score2: 0,
+        });
     }
     allMatches.push(...round1Matches);
 
-    // ── Rounds 2+: empty slots, filled by BYE winners or waiting ──
+    // ── Rounds 2+ ──
     let prevRoundMatches = round1Matches;
+
     for (let round = 2; round <= totalRounds; round++) {
         const roundMatches = [];
-        for (let i = 0; i < prevRoundMatches.length; i += 2) {
-            const bracketPos = i / 2;
-            const feederA = prevRoundMatches[i];
-            const feederB = prevRoundMatches[i + 1];
+        const numMatchesThisRound = Math.ceil(prevRoundMatches.length / 2);
+        let currentPos = 0;
 
-            // If a feeder was a BYE (auto-completed), advance the winner
+        for (let i = 0; i < prevRoundMatches.length; i += 2) {
+            const feederA = prevRoundMatches[i];
+            const feederB = prevRoundMatches[i + 1]; // Might be undefined if prevRoundMatches.length is odd
+
             const p1 = feederA?.winnerId || null;
-            const p2 = feederB?.winnerId || null;
+            let p2 = null;
+
+            let status = 'pending';
+            let winnerId = null;
+            let expectedOpponentIsMissing = false;
+
+            if (feederB) {
+                // There is a feeder match B, if it's already completed (e.g. was a BYE in lower round), p2 gets its winner
+                p2 = feederB.winnerId || null;
+            } else {
+                // There is NO feeder match B. This means the bracket implies a BYE in this upper round.
+                // The winner of Feeder A will automatically advance.
+                expectedOpponentIsMissing = true;
+            }
+
+            // If we already know both players (or one player and the other slot doesn't exist)
+            if (expectedOpponentIsMissing) {
+                if (p1) {
+                    status = 'completed';
+                    winnerId = p1;
+                }
+                // If p1 is not yet known, it will be auto-completed when feeder A finishes (handled in Matches.jsx logic)
+            }
 
             const match = {
                 selectiveId,
                 round: round,
-                bracketPosition: bracketPos,
+                bracketPosition: currentPos++,
                 player1Id: p1,
                 player2Id: p2,
             };
+
+            // Pre-complete if it's a structural BYE and we already have p1 from a previous BYE
+            if (expectedOpponentIsMissing && p1) {
+                match.status = 'completed';
+                match.winnerId = p1;
+                match.score1 = 1;
+                match.score2 = 0;
+            }
 
             roundMatches.push(match);
         }
@@ -95,7 +136,7 @@ export function generateEliminationBracket(selectiveId, playerIds) {
     return {
         matches: allMatches,
         totalRounds,
-        bracketSize: size
+        bracketSize: n // Represents total players dynamically now, not padded power of 2
     };
 }
 
