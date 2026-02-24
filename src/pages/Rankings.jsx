@@ -52,17 +52,57 @@ export default function Rankings() {
 
     // Chart
     const lineColors = ['#10b981', '#fbbf24', '#60a5fa', '#f87171', '#a78bfa'];
-    const chartData = rankings.slice(0, 5).length > 0
-        ? Array.from({ length: 10 }, (_, i) => {
-            const point = { name: `R${i + 1}` };
-            rankings.slice(0, 5).forEach(p => {
-                const base = isElo ? (p.eloRating || 1000) : (p.points || 0);
-                const variance = Math.floor((Math.random() - 0.3) * 15);
-                const progression = base * ((i + 1) / 10);
-                point[p.nickname || p.name] = Math.max(0, Math.round(progression + variance));
+    let chartData = [];
+    const top5Players = rankings.slice(0, 5);
+
+    if (top5Players.length > 0) {
+        const allEventsMap = new Map();
+
+        top5Players.forEach(p => {
+            if (Array.isArray(p.pointsHistory)) {
+                p.pointsHistory.forEach((h, idx) => {
+                    const eventKey = h.date || `Event-${idx}`;
+                    if (!allEventsMap.has(eventKey)) {
+                        allEventsMap.set(eventKey, {
+                            name: h.eventName || `Rodada ${idx + 1}`,
+                            date: h.date,
+                            idx: idx
+                        });
+                    }
+                });
+            }
+        });
+
+        const sortedEvents = Array.from(allEventsMap.values()).sort((a, b) => {
+            if (a.date && b.date) return new Date(a.date) - new Date(b.date);
+            return a.idx - b.idx;
+        });
+
+        chartData = sortedEvents.map(evt => {
+            const point = { name: evt.name };
+            top5Players.forEach(p => {
+                const playerName = p.nickname || p.name;
+                point[playerName] = null;
+
+                if (Array.isArray(p.pointsHistory)) {
+                    const histEntry = p.pointsHistory.find(h =>
+                        (h.date && h.date === evt.date) ||
+                        (!h.date && h.eventName === evt.name)
+                    );
+                    if (histEntry) {
+                        point[playerName] = isElo ? (histEntry.eloRating || 1000) : (histEntry.points || 0);
+                    }
+                }
             });
             return point;
-        }) : [];
+        });
+
+        const currentPoint = { name: 'Atual' };
+        top5Players.forEach(p => {
+            currentPoint[p.nickname || p.name] = isElo ? (p.eloRating || 1000) : (p.points || 0);
+        });
+        chartData.push(currentPoint);
+    }
 
     // Medal styles
     const medalStyles = [
@@ -440,7 +480,7 @@ export default function Rankings() {
                                     <YAxis tick={{ fill: '#475569', fontSize: 10 }} />
                                     <Tooltip contentStyle={{ background: '#1a2332', border: '1px solid rgba(148,163,184,0.12)', borderRadius: 8, fontSize: 12, color: '#f1f5f9' }} />
                                     {rankings.slice(0, 5).map((p, i) => (
-                                        <Line key={p.id} type="monotone" dataKey={p.nickname || p.name} stroke={lineColors[i]} strokeWidth={2} dot={false} />
+                                        <Line key={p.id} type="monotone" dataKey={p.nickname || p.name} stroke={lineColors[i]} strokeWidth={2} dot={true} connectNulls={true} />
                                     ))}
                                 </LineChart>
                             </ResponsiveContainer>
