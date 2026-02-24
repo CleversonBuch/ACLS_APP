@@ -76,6 +76,7 @@ export async function createPlayer(data) {
         losses: 0,
         streak: 0,
         bestStreak: 0,
+        pointsHistory: [],
         badges: []
     });
 }

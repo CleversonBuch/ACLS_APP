@@ -177,6 +177,24 @@ export default function Matches() {
     async function handleCompleteSelective() {
         if (!activeSelectiveId) return;
         setLoading(true);
+
+        // ── Save Evolution History for all active players ──
+        const selectiveEvent = selectives.find(s => s.id === activeSelectiveId);
+        const eventName = selectiveEvent ? selectiveEvent.name : `Evento ${activeSelectiveId}`;
+        const allPlayers = await getPlayers();
+
+        // We save the history for ALL players in the database so the chart advances a "round" for everyone
+        for (const p of allPlayers) {
+            const history = Array.isArray(p.pointsHistory) ? [...p.pointsHistory] : [];
+            history.push({
+                eventName: eventName,
+                points: p.points || 0,
+                eloRating: p.eloRating || 1000,
+                date: new Date().toISOString()
+            });
+            await updatePlayer(p.id, { pointsHistory: history });
+        }
+
         await updateSelective(activeSelectiveId, { status: 'completed' });
         setRefresh(r => r + 1);
     }

@@ -36,19 +36,70 @@ export default function Dashboard() {
     const nextSelective = selectives.filter(s => s.status === 'active').slice(0, 1)[0];
     const isElo = settings.rankingMode === 'elo';
 
-    // Chart data - simulate evolution from rankings
-    const chartData = rankings.slice(0, 5).length > 0
-        ? Array.from({ length: 8 }, (_, i) => {
-            const point = { name: `R${i + 1}` };
-            rankings.slice(0, 5).forEach(p => {
-                const base = isElo ? (p.eloRating || 1000) : (p.points || 0);
-                const noise = Math.floor(Math.random() * 20 - 10);
-                const scale = (i + 1) / 8;
-                point[p.nickname || p.name] = Math.max(0, Math.round(base * scale + noise));
+    // Chart data - use real evolution from pointsHistory
+    const top5Players = rankings.slice(0, 5);
+    let chartData = [];
+
+    if (top5Players.length > 0) {
+        // Collect all unique dates/eventNames across all top 5 players' histories
+        const allEventsMap = new Map();
+
+        top5Players.forEach(p => {
+            if (Array.isArray(p.pointsHistory)) {
+                p.pointsHistory.forEach((h, idx) => {
+                    const eventKey = h.date || `Event-${idx}`;
+                    if (!allEventsMap.has(eventKey)) {
+                        allEventsMap.set(eventKey, {
+                            name: h.eventName || `Rodada ${idx + 1}`,
+                            date: h.date,
+                            idx: idx
+                        });
+                    }
+                });
+            }
+        });
+
+        // Sort events chronologically
+        const sortedEvents = Array.from(allEventsMap.values()).sort((a, b) => {
+            if (a.date && b.date) return new Date(a.date) - new Date(b.date);
+            return a.idx - b.idx;
+        });
+
+        // Build the chart data points
+        chartData = sortedEvents.map(evt => {
+            const point = { name: evt.name };
+
+            top5Players.forEach(p => {
+                const playerName = p.nickname || p.name;
+                point[playerName] = null; // default to null if didn't exist then
+
+                if (Array.isArray(p.pointsHistory)) {
+                    // Find the history entry that matches this date/event
+                    const histEntry = p.pointsHistory.find(h =>
+                        (h.date && h.date === evt.date) ||
+                        (!h.date && h.eventName === evt.name)
+                    );
+
+                    if (histEntry) {
+                        point[playerName] = isElo ? (histEntry.eloRating || 1000) : (histEntry.points || 0);
+                    } else {
+                        // If they missed an event, carry over their last known score dynamically or default
+                        // (Recharts handles nulls by breaking the line, which might be preferred, 
+                        // or we could carry forward previous values. Let's use null so we see dots at actual play times, 
+                        // but `connectNulls={true}` on the Line graph below).
+                    }
+                }
             });
             return point;
-        })
-        : [];
+        });
+
+        // Always include a "Current" point at the end so the chart ends on their *actual* current score today
+        const currentPoint = { name: 'Atual' };
+        top5Players.forEach(p => {
+            currentPoint[p.nickname || p.name] = isElo ? (p.eloRating || 1000) : (p.points || 0);
+        });
+        chartData.push(currentPoint);
+    }
 
     const lineColors = ['#10b981', '#fbbf24', '#60a5fa', '#f87171', '#a78bfa'];
 
@@ -182,7 +233,8 @@ export default function Dashboard() {
                                         dataKey={p.nickname || p.name}
                                         stroke={lineColors[i]}
                                         strokeWidth={2}
-                                        dot={false}
+                                        dot={true}
+                                        connectNulls={true}
                                     />
                                 ))}
                             </LineChart>

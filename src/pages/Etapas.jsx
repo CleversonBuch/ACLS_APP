@@ -102,13 +102,34 @@ export default function Etapas() {
     async function handleSetTeamStatus(newStatus) {
         if (!activeSelectiveId || loading) return;
         setLoading(true);
+
         const updates = { teamStatus: newStatus };
+
         // Auto-complete the etapa when finalizing
         if (['champion', 'runner-up', 'third'].includes(newStatus)) {
             updates.status = 'completed';
+
+            // ── Save Evolution History for all active players ──
+            const selectiveEvent = selectives.find(s => s.id === activeSelectiveId);
+            const eventName = selectiveEvent ? selectiveEvent.name : `Etapa ${activeSelectiveId}`;
+            const allPlayers = await getPlayers();
+            // We save the history for ALL players in the database so the chart advances a "round" for everyone
+            for (const p of allPlayers) {
+                const history = Array.isArray(p.pointsHistory) ? [...p.pointsHistory] : [];
+                history.push({
+                    eventName: eventName,
+                    points: p.points || 0,
+                    eloRating: p.eloRating || 1000,
+                    date: new Date().toISOString()
+                });
+                await updatePlayer(p.id, { pointsHistory: history });
+            }
         } else if (newStatus === 'active' || newStatus === 'eliminated') {
             updates.status = 'active';
+            // Note: If they revert it, we ideally should pop the history, but since this is manual and rare,
+            // we'll keep the history log intact for now to simplify data consistency.
         }
+
         await updateSelective(activeSelectiveId, updates);
         setRefresh(r => r + 1);
     }
