@@ -421,12 +421,8 @@ export default function Matches() {
                                         rn === totalRoundsCount - 2 && totalRoundsCount > 3 ? 'Quartas de Final' :
                                             `Rodada ${roundNum}`;
 
-                                // Filter out BYE-only matches (both null or one null + auto-completed)
-                                const visibleMatches = roundMatches.filter(m => {
-                                    // Hide if it's a BYE match (one player is null and it was auto-completed in round 1)
-                                    if (m.round === 1 && (!m.player1Id || !m.player2Id) && m.status === 'completed') return false;
-                                    return true;
-                                });
+                                // Filter out BYE-only matches? No, we want to show them now so it's clear everyone starts in Round 1.
+                                const visibleMatches = roundMatches;
 
                                 if (visibleMatches.length === 0) return null;
 
@@ -439,33 +435,36 @@ export default function Matches() {
                                             const bothReady = match.player1Id && match.player2Id;
                                             const canPlay = bothReady && match.status !== 'completed' && !loading;
 
+                                            // Verify if it's a structural BYE (Round 1 auto-completed with a null player)
+                                            const isByeMatch = match.round === 1 && (!match.player1Id || !match.player2Id) && match.status === 'completed';
+
                                             return (
-                                                <div key={match.id} className={`bracket-match ${!bothReady ? 'waiting' : ''}`}>
+                                                <div key={match.id} className={`bracket-match ${!bothReady && !isByeMatch ? 'waiting' : ''}`}>
                                                     <div
                                                         className={`bracket-player ${match.winnerId === match.player1Id ? 'winner' : ''}`}
                                                         onClick={() => canPlay && handleSetWinner(match, match.player1Id)}
-                                                        style={{ cursor: canPlay ? 'pointer' : 'default', opacity: !match.player1Id ? 0.4 : 1 }}
+                                                        style={{ cursor: canPlay ? 'pointer' : 'default', opacity: (!match.player1Id && !isByeMatch) ? 0.4 : 1 }}
                                                     >
-                                                        <span className="bracket-player-name">
-                                                            {p1?.name || (match.player1Id ? 'Jogador' : 'Aguardando...')}
+                                                        <span className="bracket-player-name" style={{ color: isByeMatch && !match.player1Id ? 'var(--text-muted)' : 'inherit' }}>
+                                                            {p1?.name || (isByeMatch && !match.player1Id ? 'Avanço Direto (W.O.)' : (match.player1Id ? 'Jogador' : 'Aguardando...'))}
                                                         </span>
                                                         <span className="bracket-player-score">
-                                                            {match.winnerId === match.player1Id ? '✓' : match.player1Id ? (match.score1 ?? '-') : ''}
+                                                            {match.winnerId === match.player1Id ? '✓' : (match.player1Id ? (match.score1 ?? '-') : (isByeMatch ? '-' : ''))}
                                                         </span>
                                                     </div>
                                                     <div
                                                         className={`bracket-player ${match.winnerId === match.player2Id ? 'winner' : ''}`}
                                                         onClick={() => canPlay && handleSetWinner(match, match.player2Id)}
-                                                        style={{ cursor: canPlay ? 'pointer' : 'default', opacity: !match.player2Id ? 0.4 : 1 }}
+                                                        style={{ cursor: canPlay ? 'pointer' : 'default', opacity: (!match.player2Id && !isByeMatch) ? 0.4 : 1 }}
                                                     >
-                                                        <span className="bracket-player-name">
-                                                            {p2?.name || (match.player2Id ? 'Jogador' : 'Aguardando...')}
+                                                        <span className="bracket-player-name" style={{ color: isByeMatch && !match.player2Id ? 'var(--text-muted)' : 'inherit' }}>
+                                                            {p2?.name || (isByeMatch && !match.player2Id ? 'Avanço Direto (W.O.)' : (match.player2Id ? 'Jogador' : 'Aguardando...'))}
                                                         </span>
                                                         <span className="bracket-player-score">
-                                                            {match.winnerId === match.player2Id ? '✓' : match.player2Id ? (match.score2 ?? '-') : ''}
+                                                            {match.winnerId === match.player2Id ? '✓' : (match.player2Id ? (match.score2 ?? '-') : (isByeMatch ? '-' : ''))}
                                                         </span>
                                                     </div>
-                                                    {match.status === 'completed' && bothReady && (
+                                                    {match.status === 'completed' && bothReady && !isByeMatch && (
                                                         <div style={{ textAlign: 'center', borderTop: '1px solid var(--border-subtle)' }}>
                                                             <button
                                                                 className="btn btn-sm"
