@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSelective, deleteSelective, createMatch } from '../data/db.js';
 import { applyMatchResult, reverseMatchResult, getHeadToHeadResult } from '../data/rankingEngine.js';
+import { generateSwissRound } from '../data/tournamentEngine.js';
 import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader } from 'lucide-react';
 
 export default function Matches() {
@@ -83,6 +84,47 @@ export default function Matches() {
             if (nextMatch) {
                 const slot = getSlotInNextMatch(match);
                 await updateMatch(nextMatch.id, { [slot]: winnerId });
+            }
+        }
+
+        // ── Swiss auto-generate next round ──
+        if (selective?.mode === 'swiss') {
+            const allMatches = await getMatchesBySelective(activeSelectiveId);
+            const currentRound = match.round;
+            const maxRounds = selective.config?.rounds || 3;
+            const currentRoundMatches = allMatches.filter(m => m.round === currentRound);
+            const allDone = currentRoundMatches.every(m => m.status === 'completed');
+
+            // Check if next round already exists
+            const nextRoundExists = allMatches.some(m => m.round === currentRound + 1);
+
+            if (allDone && currentRound < maxRounds && !nextRoundExists) {
+                console.log(`[Swiss] Round ${currentRound} complete! Generating round ${currentRound + 1}...`);
+
+                // Build simple rankings from current standings
+                const playerIds = selective.playerIds || [];
+                const rankMap = {};
+                playerIds.forEach(pid => { rankMap[pid] = { id: pid, points: 0 }; });
+                const completedMatches = allMatches.filter(m => m.status === 'completed' && m.winnerId);
+                const ptsWin = selective.config?.pointsPerWin ?? 3;
+                completedMatches.forEach(m => {
+                    if (rankMap[m.winnerId]) rankMap[m.winnerId].points += ptsWin;
+                });
+                const rankings = Object.values(rankMap).sort((a, b) => b.points - a.points);
+
+                // Generate next round
+                const { matches: nextMatches } = generateSwissRound(
+                    selective.id,
+                    playerIds,
+                    rankings,
+                    currentRound + 1,
+                    completedMatches
+                );
+
+                for (const nm of nextMatches) {
+                    await createMatch(nm);
+                }
+                console.log(`[Swiss] Generated ${nextMatches.length} matches for round ${currentRound + 1}`);
             }
         }
 

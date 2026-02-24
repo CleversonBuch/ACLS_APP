@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getSelectives, getPlayer, getPlayers, updateSelective, deleteSelective, updatePlayer } from '../data/db.js';
 import { applyFixedPoints } from '../data/rankingEngine.js';
-import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Swords, Shield, Loader } from 'lucide-react';
+import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Swords, Shield, Loader, Trophy, Medal, Award } from 'lucide-react';
 
 export default function Etapas() {
     const [selectives, setSelectives] = useState([]);
@@ -84,10 +84,40 @@ export default function Etapas() {
         return { ...c, ourWins, theirWins, isFinished, isVictory, slots };
     });
 
-    const isEliminated = totalLosses >= 2;
+    // Manual team status system
+    const teamStatus = activeSelective?.teamStatus || 'active';
     const isActive = activeSelective?.status === 'active';
-    const hasActiveConfront = mappedConfronts.some(c => !c.isFinished);
-    const canComplete = isEliminated;
+    const isFinalized = ['champion', 'runner-up', 'third'].includes(teamStatus);
+    const canAddConfront = isActive && !isFinalized;
+
+    const STATUS_OPTIONS = [
+        { key: 'active', label: 'Em Disputa', emoji: '⚔️', color: 'var(--gold-400)', bg: 'rgba(234,179,8,0.08)', border: 'rgba(234,179,8,0.25)' },
+        { key: 'eliminated', label: 'Eliminada', emoji: '🚨', color: 'var(--red-400)', bg: 'rgba(239,68,68,0.05)', border: 'rgba(239,68,68,0.3)' },
+        { key: 'champion', label: 'Campeã! 🏆', emoji: '🏆', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.4)' },
+        { key: 'runner-up', label: 'Vice 🥈', emoji: '🥈', color: '#94a3b8', bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.3)' },
+        { key: 'third', label: '3º Lugar 🥉', emoji: '🥉', color: '#cd7f32', bg: 'rgba(205,127,50,0.08)', border: 'rgba(205,127,50,0.3)' }
+    ];
+    const currentStatusOption = STATUS_OPTIONS.find(s => s.key === teamStatus) || STATUS_OPTIONS[0];
+
+    async function handleSetTeamStatus(newStatus) {
+        if (!activeSelectiveId || loading) return;
+        setLoading(true);
+        const updates = { teamStatus: newStatus };
+        // Auto-complete the etapa when finalizing
+        if (['champion', 'runner-up', 'third'].includes(newStatus)) {
+            updates.status = 'completed';
+        } else if (newStatus === 'active' || newStatus === 'eliminated') {
+            updates.status = 'active';
+        }
+        await updateSelective(activeSelectiveId, updates);
+        setRefresh(r => r + 1);
+    }
+
+    function getTabEmoji(sel) {
+        const st = sel.teamStatus || 'active';
+        const opt = STATUS_OPTIONS.find(s => s.key === st);
+        return opt ? opt.emoji : '🏆';
+    }
 
     if (loading && Object.keys(playersMap).length === 0) {
         return (
@@ -111,11 +141,6 @@ export default function Etapas() {
                             <Trash2 size={16} /> Apagar Etapa
                         </button>
                     )}
-                    {isActive && canComplete && (
-                        <button className="btn btn-gold" onClick={() => !loading && handleCompleteSelective()} disabled={loading}>
-                            <CheckCircle size={18} /> Finalizar Etapa
-                        </button>
-                    )}
                 </div>
             </div>
 
@@ -129,7 +154,7 @@ export default function Etapas() {
                             onClick={() => !loading && setActiveSelectiveId(s.id)}
                             disabled={loading}
                         >
-                            🏆 {s.name} {s.status === 'completed' ? '✅' : '🔵'}
+                            {getTabEmoji(s)} {s.name}
                         </button>
                     ))}
                 </div>
@@ -141,20 +166,50 @@ export default function Etapas() {
                     {(workingConfronts.length > 0 || wizardStep > 0) && (
                         <div className="card" style={{
                             padding: 24, textAlign: 'center',
-                            background: isEliminated ? 'rgba(239,68,68,0.05)' : 'var(--bg-elevated)',
-                            border: isEliminated ? '2px solid rgba(239,68,68,0.3)' : '1px solid var(--border-subtle)'
+                            background: currentStatusOption.bg,
+                            border: `2px solid ${currentStatusOption.border}`
                         }}>
-                            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, margin: '0 0 16px', color: isEliminated ? 'var(--red-400)' : 'var(--text-primary)' }}>
-                                {isEliminated ? '🚨 EQUIPE ELIMINADA' : 'Desempenho da Equipe'}
+                            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, margin: '0 0 16px', color: currentStatusOption.color }}>
+                                {teamStatus === 'eliminated' && '🚨 EQUIPE ELIMINADA'}
+                                {teamStatus === 'champion' && '🏆 CAMPEÃ!'}
+                                {teamStatus === 'runner-up' && '🥈 VICE-CAMPEÃ'}
+                                {teamStatus === 'third' && '🥉 TERCEIRO LUGAR'}
+                                {teamStatus === 'active' && '⚔️ Em Disputa'}
                             </h2>
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: 40 }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: 40, marginBottom: 20 }}>
                                 <div>
                                     <div style={{ fontSize: 11, color: 'var(--green-400)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>Vitórias</div>
                                     <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 900, color: 'var(--green-400)', lineHeight: 1 }}>{totalWins}</div>
                                 </div>
                                 <div>
                                     <div style={{ fontSize: 11, color: 'var(--red-400)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>Derrotas</div>
-                                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 900, color: 'var(--red-400)', lineHeight: 1 }}>{totalLosses} <span style={{ fontSize: 20, color: 'var(--text-dim)', fontWeight: 500 }}>/ 2</span></div>
+                                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 900, color: 'var(--red-400)', lineHeight: 1 }}>{totalLosses}</div>
+                                </div>
+                            </div>
+
+                            {/* Status Selector */}
+                            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
+                                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10 }}>Status da Equipe</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                                    {STATUS_OPTIONS.map(opt => (
+                                        <button
+                                            key={opt.key}
+                                            disabled={loading}
+                                            onClick={() => handleSetTeamStatus(opt.key)}
+                                            style={{
+                                                padding: '8px 16px', borderRadius: 20,
+                                                border: teamStatus === opt.key ? `2px solid ${opt.color}` : '2px solid var(--border-subtle)',
+                                                background: teamStatus === opt.key ? opt.bg : 'var(--bg-elevated)',
+                                                color: teamStatus === opt.key ? opt.color : 'var(--text-muted)',
+                                                fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
+                                                cursor: loading ? 'not-allowed' : 'pointer',
+                                                transition: 'all 0.15s',
+                                                opacity: loading ? 0.5 : 1
+                                            }}
+                                        >
+                                            {opt.emoji} {opt.label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         </div>
@@ -359,7 +414,7 @@ export default function Etapas() {
                     })}
 
                     {/* ── WIZARD OR NEW CONFRONT BUTTON ── */}
-                    {isActive && !isEliminated && wizardStep === 0 && (
+                    {canAddConfront && wizardStep === 0 && (
                         <div className="card" style={{ textAlign: 'center', padding: 32 }}>
                             <Swords size={40} style={{ color: 'var(--gold-400)', marginBottom: 12 }} />
                             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 8 }}>Novo Confronto</h3>

@@ -138,6 +138,7 @@ export async function createSelective(data) {
     if (eventType === 'etapa') {
         payload.teamConfronts = data.teamConfronts || [];
         payload.teamConfront = data.teamConfront || null;
+        payload.teamStatus = data.teamStatus || 'active';
     }
 
     console.log(`[createSelective] Final payload keys:`, Object.keys(payload));

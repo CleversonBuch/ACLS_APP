@@ -180,17 +180,24 @@ export default function CreateSelective() {
                     <div className="card" style={{ marginBottom: 20 }}>
                         <h3 className="card-title" style={{ marginBottom: 16 }}>Configurações</h3>
                         <div className="form-row">
-                            {mode === 'round-robin' && (
+                            {(mode === 'round-robin' || mode === 'swiss') && (
                                 <div className="form-group">
-                                    <label className="form-label">Número de Rodadas (Turnos)</label>
+                                    <label className="form-label">
+                                        {mode === 'swiss' ? 'Número de Rodadas' : 'Número de Rodadas (Turnos)'}
+                                    </label>
                                     <input
                                         className="form-input"
                                         type="number"
                                         min={1}
-                                        max={5}
+                                        max={mode === 'swiss' ? 10 : 5}
                                         value={config.rounds}
                                         onChange={e => setConfig({ ...config, rounds: parseInt(e.target.value) || 1 })}
                                     />
+                                    {mode === 'swiss' && (
+                                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>
+                                            Recomendado: {Math.ceil(Math.log2(selectedPlayers.length || 2))} rodadas para {selectedPlayers.length} jogadores
+                                        </span>
+                                    )}
                                 </div>
                             )}
                             <div className="form-group">

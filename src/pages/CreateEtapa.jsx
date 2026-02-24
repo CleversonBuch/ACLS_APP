@@ -25,11 +25,12 @@ export default function CreateEtapa() {
 
         const selective = await createSelective({
             name,
-            mode: 'team-vs-team', // Or similar dummy identifier since matches are manual
+            mode: 'team-vs-team',
             eventType: 'etapa',
-            playerIds: [], // Players are selected per confrontation wizard
-            config: {}, // Assuming points logic is external in Etapas mode
-            teamConfronts: [] // Starts empty
+            playerIds: [],
+            config: {},
+            teamConfronts: [],
+            teamStatus: 'active'
         });
 
         setCreated(true);
@@ -84,7 +85,7 @@ export default function CreateEtapa() {
                                 <ul style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 12, paddingLeft: 20 }}>
                                     <li>Múltiplos confrontos podem ser adicionados dentro da Etapa.</li>
                                     <li>Um confronto se encerra quando uma equipe alcança 3 vitórias.</li>
-                                    <li>Sua equipe é eliminada ao acumular 2 derrotas.</li>
+                                    <li>Você sinaliza manualmente o resultado final (Campeã, Vice, Eliminada, etc).</li>
                                     <li>As vitórias individuais contam para o Ranking.</li>
                                 </ul>
                             </div>
