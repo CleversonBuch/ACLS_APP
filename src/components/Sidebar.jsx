@@ -9,7 +9,8 @@ import {
     History,
     Crown,
     Menu,
-    X
+    X,
+    Shield
 } from 'lucide-react';
 
 const navItems = [
@@ -22,6 +23,7 @@ const navItems = [
     { path: '/jogadores', icon: Users, label: 'Jogadores' },
     { path: '/historico', icon: History, label: 'Histórico' },
     { path: '/hall-da-fama', icon: Crown, label: 'Hall da Fama' },
+    { path: '/admin', icon: Shield, label: 'Admin' },
 ];
 
 export default function Sidebar() {

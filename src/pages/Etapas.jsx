@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { getSelectives, getPlayer, getPlayers, updateSelective, deleteSelective, updatePlayer } from '../data/db.js';
 import { applyFixedPoints } from '../data/rankingEngine.js';
 import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Swords, Shield, Loader, Trophy, Medal, Award } from 'lucide-react';
+import { useAdmin } from '../contexts/AdminContext.jsx';
 
 export default function Etapas() {
+    const { isAdmin } = useAdmin();
     const [selectives, setSelectives] = useState([]);
     const [activeSelectiveId, setActiveSelectiveId] = useState(null);
     const [playersMap, setPlayersMap] = useState({});
@@ -156,13 +158,15 @@ export default function Etapas() {
                     <h1 className="page-title">Etapas</h1>
                     <p className="page-subtitle">Gerenciar confrontos 5x5 contra outras equipes</p>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    {activeSelective && (
-                        <button className="btn btn-danger btn-sm" onClick={() => !loading && setDeleteConfirmStep(1)} disabled={loading}>
-                            <Trash2 size={16} /> Apagar Etapa
-                        </button>
-                    )}
-                </div>
+                {isAdmin && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        {activeSelective && (
+                            <button className="btn btn-danger btn-sm" onClick={() => !loading && setDeleteConfirmStep(1)} disabled={loading}>
+                                <Trash2 size={16} /> Apagar Etapa
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Etapa Selector */}
@@ -209,30 +213,32 @@ export default function Etapas() {
                             </div>
 
                             {/* Status Selector */}
-                            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
-                                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10 }}>Status da Equipe</div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-                                    {STATUS_OPTIONS.map(opt => (
-                                        <button
-                                            key={opt.key}
-                                            disabled={loading}
-                                            onClick={() => handleSetTeamStatus(opt.key)}
-                                            style={{
-                                                padding: '8px 16px', borderRadius: 20,
-                                                border: teamStatus === opt.key ? `2px solid ${opt.color}` : '2px solid var(--border-subtle)',
-                                                background: teamStatus === opt.key ? opt.bg : 'var(--bg-elevated)',
-                                                color: teamStatus === opt.key ? opt.color : 'var(--text-muted)',
-                                                fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
-                                                cursor: loading ? 'not-allowed' : 'pointer',
-                                                transition: 'all 0.15s',
-                                                opacity: loading ? 0.5 : 1
-                                            }}
-                                        >
-                                            {opt.emoji} {opt.label}
-                                        </button>
-                                    ))}
+                            {isAdmin && (
+                                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16 }}>
+                                    <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 10 }}>Status da Equipe</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                                        {STATUS_OPTIONS.map(opt => (
+                                            <button
+                                                key={opt.key}
+                                                disabled={loading}
+                                                onClick={() => handleSetTeamStatus(opt.key)}
+                                                style={{
+                                                    padding: '8px 16px', borderRadius: 20,
+                                                    border: teamStatus === opt.key ? `2px solid ${opt.color}` : '2px solid var(--border-subtle)',
+                                                    background: teamStatus === opt.key ? opt.bg : 'var(--bg-elevated)',
+                                                    color: teamStatus === opt.key ? opt.color : 'var(--text-muted)',
+                                                    fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
+                                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                                    transition: 'all 0.15s',
+                                                    opacity: loading ? 0.5 : 1
+                                                }}
+                                            >
+                                                {opt.emoji} {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     )}
 
@@ -322,62 +328,68 @@ export default function Etapas() {
 
                                                 {/* Big action buttons */}
                                                 {!isDone && isActive && !isFinished ? (
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
-                                                        <button
-                                                            disabled={loading}
-                                                            onClick={async () => {
-                                                                setLoading(true);
-                                                                const newSlots = [...slots];
-                                                                newSlots[idx] = { ...newSlots[idx], result: 'win' };
-                                                                const newTeamConfronts = [...workingConfronts];
-                                                                newTeamConfronts[tcIdx] = { ...tc, slots: newSlots };
-                                                                await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
+                                                    isAdmin ? (
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                                                            <button
+                                                                disabled={loading}
+                                                                onClick={async () => {
+                                                                    setLoading(true);
+                                                                    const newSlots = [...slots];
+                                                                    newSlots[idx] = { ...newSlots[idx], result: 'win' };
+                                                                    const newTeamConfronts = [...workingConfronts];
+                                                                    newTeamConfronts[tcIdx] = { ...tc, slots: newSlots };
+                                                                    await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
 
-                                                                const config = activeSelective?.config || {};
-                                                                await applyFixedPoints(slot.playerId, null, config);
-                                                                setRefresh(r => r + 1);
-                                                            }}
-                                                            style={{
-                                                                padding: '14px 0', border: 'none', cursor: 'pointer',
-                                                                background: 'rgba(16,185,129,0.12)', color: 'var(--green-400)',
-                                                                fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15,
-                                                                borderRight: '1px solid var(--border-subtle)',
-                                                                borderTop: '1px solid var(--border-subtle)'
-                                                            }}
-                                                        >
-                                                            ✅ VITÓRIA
-                                                        </button>
-                                                        <button
-                                                            disabled={loading}
-                                                            onClick={async () => {
-                                                                setLoading(true);
-                                                                const newSlots = [...slots];
-                                                                newSlots[idx] = { ...newSlots[idx], result: 'loss' };
-                                                                const newTeamConfronts = [...workingConfronts];
-                                                                newTeamConfronts[tcIdx] = { ...tc, slots: newSlots };
-                                                                await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
-
-                                                                const p = playersMap[slot.playerId];
-                                                                if (p) {
                                                                     const config = activeSelective?.config || {};
-                                                                    await updatePlayer(slot.playerId, {
-                                                                        losses: (p.losses || 0) + 1,
-                                                                        points: (p.points || 0) + (config.pointsPerLoss ?? 0),
-                                                                        streak: 0
-                                                                    });
-                                                                }
-                                                                setRefresh(r => r + 1);
-                                                            }}
-                                                            style={{
-                                                                padding: '14px 0', border: 'none', cursor: 'pointer',
-                                                                background: 'rgba(239,68,68,0.12)', color: 'var(--red-400)',
-                                                                fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15,
-                                                                borderTop: '1px solid var(--border-subtle)'
-                                                            }}
-                                                        >
-                                                            ❌ DERROTA
-                                                        </button>
-                                                    </div>
+                                                                    await applyFixedPoints(slot.playerId, null, config);
+                                                                    setRefresh(r => r + 1);
+                                                                }}
+                                                                style={{
+                                                                    padding: '14px 0', border: 'none', cursor: 'pointer',
+                                                                    background: 'rgba(16,185,129,0.12)', color: 'var(--green-400)',
+                                                                    fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15,
+                                                                    borderRight: '1px solid var(--border-subtle)',
+                                                                    borderTop: '1px solid var(--border-subtle)'
+                                                                }}
+                                                            >
+                                                                ✅ VITÓRIA
+                                                            </button>
+                                                            <button
+                                                                disabled={loading}
+                                                                onClick={async () => {
+                                                                    setLoading(true);
+                                                                    const newSlots = [...slots];
+                                                                    newSlots[idx] = { ...newSlots[idx], result: 'loss' };
+                                                                    const newTeamConfronts = [...workingConfronts];
+                                                                    newTeamConfronts[tcIdx] = { ...tc, slots: newSlots };
+                                                                    await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
+
+                                                                    const p = playersMap[slot.playerId];
+                                                                    if (p) {
+                                                                        const config = activeSelective?.config || {};
+                                                                        await updatePlayer(slot.playerId, {
+                                                                            losses: (p.losses || 0) + 1,
+                                                                            points: (p.points || 0) + (config.pointsPerLoss ?? 0),
+                                                                            streak: 0
+                                                                        });
+                                                                    }
+                                                                    setRefresh(r => r + 1);
+                                                                }}
+                                                                style={{
+                                                                    padding: '14px 0', border: 'none', cursor: 'pointer',
+                                                                    background: 'rgba(239,68,68,0.12)', color: 'var(--red-400)',
+                                                                    fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15,
+                                                                    borderTop: '1px solid var(--border-subtle)'
+                                                                }}
+                                                            >
+                                                                ❌ DERROTA
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ padding: '10px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, borderTop: '1px solid var(--border-subtle)' }}>
+                                                            Aguardando resultado...
+                                                        </div>
+                                                    )
                                                 ) : isDone ? (
                                                     <div style={{
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -390,7 +402,7 @@ export default function Etapas() {
                                                         }}>
                                                             {isWin ? '✅ VITÓRIA' : '❌ DERROTA'}
                                                         </span>
-                                                        {isActive && (
+                                                        {isActive && isAdmin && (
                                                             <button
                                                                 disabled={loading}
                                                                 onClick={async () => {
@@ -435,7 +447,7 @@ export default function Etapas() {
                     })}
 
                     {/* ── WIZARD OR NEW CONFRONT BUTTON ── */}
-                    {canAddConfront && wizardStep === 0 && (
+                    {canAddConfront && wizardStep === 0 && isAdmin && (
                         <div className="card" style={{ textAlign: 'center', padding: 32 }}>
                             <Swords size={40} style={{ color: 'var(--gold-400)', marginBottom: 12 }} />
                             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 8 }}>Novo Confronto</h3>

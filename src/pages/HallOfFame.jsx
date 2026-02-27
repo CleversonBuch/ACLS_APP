@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { getPlayers, getSeasons, getPlayer, resetHallOfFame } from '../data/db.js';
 import { getRankings, getWinRate } from '../data/rankingEngine.js';
 import { Crown, Trophy, Flame, Star, Medal, Award, Trash2, AlertTriangle, XCircle, Loader } from 'lucide-react';
+import { useAdmin } from '../contexts/AdminContext.jsx';
 
 export default function HallOfFame() {
+    const { isAdmin } = useAdmin();
     const [rankings, setRankingsList] = useState([]);
     const [seasons, setSeasons] = useState([]);
     const [players, setPlayers] = useState([]);
@@ -68,9 +70,11 @@ export default function HallOfFame() {
                     <h1 className="page-title">🏛️ Hall da Fama</h1>
                     <p className="page-subtitle">Os maiores feitos da liga</p>
                 </div>
-                <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmOpen(true)}>
-                    <Trash2 size={16} /> Apagar Dados
-                </button>
+                {isAdmin && (
+                    <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmOpen(true)}>
+                        <Trash2 size={16} /> Apagar Dados
+                    </button>
+                )}
             </div>
 
             {/* Champions Timeline */}

@@ -181,6 +181,20 @@ export async function getRankings() {
     const players = await getPlayers();
     const allMatches = await getAll('matches');
 
+    // Calculate generic SB score globally for tiebreakers
+    players.forEach(p => {
+        let sb = 0;
+        const pWins = allMatches.filter(m => m.status === 'completed' && m.winnerId === p.id);
+        pWins.forEach(w => {
+            const loserId = w.player1Id === p.id ? w.player2Id : w.player1Id;
+            const loser = players.find(x => x.id === loserId);
+            if (loser) {
+                sb += (loser.points || 0);
+            }
+        });
+        p.sbScore = sb;
+    });
+
     if (settings.rankingMode === 'elo') {
         return [...players].sort((a, b) => (b.eloRating || 1000) - (a.eloRating || 1000));
     } else {
@@ -188,6 +202,9 @@ export async function getRankings() {
             if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
             const h2h = getHeadToHeadResult(a.id, b.id, allMatches);
             if (h2h !== 0) return -h2h;
+            // Desempate triplo via SB Score
+            if ((b.sbScore || 0) !== (a.sbScore || 0)) return (b.sbScore || 0) - (a.sbScore || 0);
+
             const aRate = (a.wins || 0) / Math.max(1, (a.wins || 0) + (a.losses || 0));
             const bRate = (b.wins || 0) / Math.max(1, (b.wins || 0) + (b.losses || 0));
             if (bRate !== aRate) return bRate - aRate;

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { getRankings, getWinRate, getPlayerScore } from '../data/rankingEngine.js';
 import { getSettings, updateSettings, resetCurrentRanking } from '../data/db.js';
-import { TrendingUp, TrendingDown, Minus, Settings, Crown, Award, Zap, Trophy, Star, Flame, Trash2, AlertTriangle, XCircle, Loader } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Settings, Crown, Award, Zap, Trophy, Star, Flame, Trash2, AlertTriangle, XCircle, Loader, HelpCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { useAdmin } from '../contexts/AdminContext.jsx';
 
 export default function Rankings() {
+    const { isAdmin } = useAdmin();
     const [rankings, setRankingsList] = useState([]);
     const [settings, setSettingsState] = useState({ rankingMode: 'points' });
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -141,22 +143,46 @@ export default function Rankings() {
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Trophy size={28} style={{ color: 'var(--gold-400)' }} /> Ranking Geral
+                        <div className="tooltip-container" style={{ marginLeft: 4 }}>
+                            <HelpCircle size={18} className="tooltip-icon" />
+                            <div className="tooltip-text" style={{ fontWeight: 'normal', fontSize: 11, textAlign: 'left' }}>
+                                <strong style={{ color: 'var(--green-400)' }}>Como funciona o Ranking?</strong><br />
+                                {isElo ? (
+                                    <>
+                                        Sistema Rating ELO internacional.<br /><br />
+                                        Vitórias rendem ELO (máx +32), mas o quanto você ganha depende da força do adversário.
+                                        Derrotar um líder rende muito ELO! Perder para um novato tira muito ELO!
+                                    </>
+                                ) : (
+                                    <>
+                                        <strong>Critérios de Desempate (Ordem):</strong><br />
+                                        1. Mais Pontos (Vit=3, Der=0)<br />
+                                        2. Confronto Direto (Geral)<br />
+                                        3. Qualidade de Vitórias (Buchholz)<br />
+                                        4. Melhor Aproveitamento %<br />
+                                        5. Mais Vitórias
+                                    </>
+                                )}
+                            </div>
+                        </div>
                     </h1>
                     <p className="page-subtitle">{rankings.length} jogadores classificados · {isElo ? 'ELO Rating' : 'Pontos Fixos'}</p>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
-                    <div className="toggle-group">
-                        <button className={`toggle-option ${!isElo ? 'active' : ''}`} onClick={() => toggleMode('points')}>
-                            Pontos Fixos
-                        </button>
-                        <button className={`toggle-option ${isElo ? 'active' : ''}`} onClick={() => toggleMode('elo')}>
-                            ELO Rating
+                {isAdmin && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+                        <div className="toggle-group">
+                            <button className={`toggle-option ${!isElo ? 'active' : ''}`} onClick={() => toggleMode('points')}>
+                                Pontos Fixos
+                            </button>
+                            <button className={`toggle-option ${isElo ? 'active' : ''}`} onClick={() => toggleMode('elo')}>
+                                ELO Rating
+                            </button>
+                        </div>
+                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmOpen(true)}>
+                            <Trash2 size={16} /> Apagar Dados
                         </button>
                     </div>
-                    <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmOpen(true)}>
-                        <Trash2 size={16} /> Apagar Dados
-                    </button>
-                </div>
+                )}
             </div>
 
             {loading ? (

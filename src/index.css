@@ -1718,3 +1718,64 @@ textarea {
   border-radius: 999px;
   transition: width var(--transition-slow);
 }
+
+/* ============================================
+   Tooltips
+   ============================================ */
+.tooltip-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+}
+
+.tooltip-icon {
+  color: var(--text-muted);
+  transition: color var(--transition-fast);
+}
+
+.tooltip-container:hover .tooltip-icon {
+  color: var(--gold-400);
+}
+
+.tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  text-align: center;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  white-space: normal;
+  min-width: 220px;
+  max-width: 280px;
+  z-index: 1000;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-md);
+  transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+  pointer-events: none;
+  line-height: 1.5;
+}
+
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(-4px);
+}
+
+.tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--bg-elevated) transparent transparent transparent;
+}

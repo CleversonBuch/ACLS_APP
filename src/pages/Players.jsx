@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { getPlayers, createPlayer, updatePlayer, deletePlayer, getPlayerStageStats, getPlayerExternalStats } from '../data/db.js';
 import { getWinRate, getRankings } from '../data/rankingEngine.js';
 import { UserPlus, X, Edit, Trash2, Search, Upload, Camera, Loader } from 'lucide-react';
+import { useAdmin } from '../contexts/AdminContext.jsx';
 
 export default function Players() {
+    const { isAdmin } = useAdmin();
     const [players, setPlayers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -104,9 +106,11 @@ export default function Players() {
                     <h1 className="page-title">Jogadores</h1>
                     <p className="page-subtitle">{players.length} jogadores cadastrados</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setEditingPlayer(null); setForm({ name: '', nickname: '', photo: '' }); setShowModal(true); }}>
-                    <UserPlus size={18} /> Novo Jogador
-                </button>
+                {isAdmin && (
+                    <button className="btn btn-primary" onClick={() => { setEditingPlayer(null); setForm({ name: '', nickname: '', photo: '' }); setShowModal(true); }}>
+                        <UserPlus size={18} /> Novo Jogador
+                    </button>
+                )}
             </div>
 
             {/* Search */}
@@ -219,14 +223,16 @@ export default function Players() {
                                 </div>
                             )}
 
-                            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
-                                <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(player)} disabled={loading}>
-                                    <Edit size={14} /> Editar
-                                </button>
-                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(player.id)} disabled={loading}>
-                                    <Trash2 size={14} />
-                                </button>
-                            </div>
+                            {isAdmin && (
+                                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
+                                    <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(player)} disabled={loading}>
+                                        <Edit size={14} /> Editar
+                                    </button>
+                                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(player.id)} disabled={loading}>
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { createSelective, getSelectives } from '../data/db.js';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Check } from 'lucide-react';
+import { useAdmin } from '../contexts/AdminContext.jsx';
 
 export default function CreateEtapa() {
+    const { isAdmin } = useAdmin();
     const navigate = useNavigate();
     const [name, setName] = useState('');
     const [created, setCreated] = useState(false);
@@ -93,12 +95,18 @@ export default function CreateEtapa() {
                     </div>
 
                     {/* Generate Button */}
-                    <button
-                        className="btn btn-gold btn-lg btn-block"
-                        onClick={handleGenerate}
-                    >
-                        <Zap size={20} /> Iniciar Etapa
-                    </button>
+                    {isAdmin ? (
+                        <button
+                            className="btn btn-gold btn-lg btn-block"
+                            onClick={handleGenerate}
+                        >
+                            <Zap size={20} /> Iniciar Etapa
+                        </button>
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: 12, color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 8, marginBottom: 12 }}>
+                            Apenas administradores podem iniciar novas etapas.
+                        </div>
+                    )}
 
                     <button
                         className="btn btn-secondary btn-lg btn-block"

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSelective, deleteSelective, createMatch, updatePlayer } from '../data/db.js';
 import { applyMatchResult, reverseMatchResult, getHeadToHeadResult } from '../data/rankingEngine.js';
 import { generateSwissRound } from '../data/tournamentEngine.js';
-import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader } from 'lucide-react';
+import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle } from 'lucide-react';
+import { useAdmin } from '../contexts/AdminContext.jsx';
 
 export default function Matches() {
+    const { isAdmin } = useAdmin();
     const [selectives, setSelectives] = useState([]);
     const [activeSelectiveId, setActiveSelectiveId] = useState(null);
     const [matches, setMatches] = useState([]);
@@ -321,9 +323,11 @@ export default function Matches() {
         const map = {};
         playerIds.forEach(pid => {
             const p = playersMap[pid];
-            map[pid] = { id: pid, name: p?.name || '?', nickname: p?.nickname || '', photo: p?.photo || '', wins: 0, losses: 0, points: 0 };
+            map[pid] = { id: pid, name: p?.name || '?', nickname: p?.nickname || '', photo: p?.photo || '', wins: 0, losses: 0, points: 0, sbScore: 0 };
         });
         const completedMatches = matches.filter(m => m.status === 'completed' && m.winnerId);
+
+        // 1. Calculate standard points
         completedMatches.forEach(m => {
             const config = activeSelective.config || {};
             const ptsWin = config.pointsPerWin ?? 3;
@@ -338,15 +342,30 @@ export default function Matches() {
                 map[loserId].points += ptsLoss;
             }
         });
+
+        // 2. Calculate Sonneborn-Berger (SB) Score for tiebreakers
+        // SB Score = sum of points of all defeated opponents
+        Object.values(map).forEach(player => {
+            const wins = completedMatches.filter(m => m.winnerId === player.id);
+            wins.forEach(w => {
+                const loserId = w.player1Id === player.id ? w.player2Id : w.player1Id;
+                if (loserId && map[loserId]) {
+                    player.sbScore += map[loserId].points;
+                }
+            });
+        });
+
         return Object.values(map).sort((a, b) => {
             // 1st: points
             if (b.points !== a.points) return b.points - a.points;
             // 2nd: confronto direto (head-to-head within this selective)
             const h2h = getHeadToHeadResult(a.id, b.id, completedMatches);
             if (h2h !== 0) return -h2h;
-            // 3rd: more wins
+            // 3rd: Sonneborn-Berger score (Qualidade de vitórias)
+            if (b.sbScore !== a.sbScore) return b.sbScore - a.sbScore;
+            // 4th: more wins
             if (b.wins !== a.wins) return b.wins - a.wins;
-            // 4th: fewer losses
+            // 5th: fewer losses
             return a.losses - b.losses;
         });
     })();
@@ -368,12 +387,12 @@ export default function Matches() {
                     <p className="page-subtitle">Definir resultados das partidas</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                    {activeSelective && (
+                    {activeSelective && isAdmin && (
                         <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmStep(1)}>
                             <Trash2 size={16} /> Apagar Seletiva
                         </button>
                     )}
-                    {activeSelective?.status === 'active' && canComplete && (
+                    {activeSelective?.status === 'active' && canComplete && isAdmin && (
                         <button className="btn btn-gold" onClick={handleCompleteSelective}>
                             <CheckCircle size={18} /> Finalizar Seletiva
                         </button>
@@ -427,7 +446,20 @@ export default function Matches() {
                     {standings.length > 0 && completedCount > 0 && (
                         <div className="card" style={{ marginBottom: 20 }}>
                             <div className="card-header">
-                                <h3 className="card-title">📊 Resultado da Seletiva</h3>
+                                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    📊 Resultado da Seletiva
+                                    <div className="tooltip-container">
+                                        <HelpCircle size={14} className="tooltip-icon" />
+                                        <div className="tooltip-text">
+                                            <strong style={{ color: 'var(--green-400)' }}>Critérios de Desempate (Ordem):</strong><br />
+                                            1. Mais Pontos<br />
+                                            2. Confronto Direto<br />
+                                            3. Qualidade de Vit. (Buchholz)<br />
+                                            4. Mais Vitórias<br />
+                                            5. Menos Derrotas
+                                        </div>
+                                    </div>
+                                </h3>
                                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                                     {activeSelective?.config?.pointsPerWin ?? 3} pts/vitória · {activeSelective?.config?.pointsPerLoss ?? 0} pts/derrota
                                 </span>
@@ -521,7 +553,7 @@ export default function Matches() {
                                             const p1 = match.player1Id ? playersMap[match.player1Id] : null;
                                             const p2 = match.player2Id ? playersMap[match.player2Id] : null;
                                             const bothReady = match.player1Id && match.player2Id;
-                                            const canPlay = bothReady && match.status !== 'completed' && !loading;
+                                            const canPlay = bothReady && match.status !== 'completed' && !loading && isAdmin;
 
                                             // Verify if it's a structural BYE (Round 1 or later auto-completed with a null player)
                                             // Since we auto-complete structural byes immediately, checking for status === 'completed', 
@@ -557,7 +589,7 @@ export default function Matches() {
                                                             {match.winnerId === match.player2Id ? '✓' : (match.player2Id ? (match.score2 ?? '-') : (isByeMatch ? '-' : ''))}
                                                         </span>
                                                     </div>
-                                                    {match.status === 'completed' && bothReady && !isByeMatch && (
+                                                    {match.status === 'completed' && bothReady && !isByeMatch && isAdmin && (
                                                         <div style={{ textAlign: 'center', borderTop: '1px solid var(--border-subtle)' }}>
                                                             <button
                                                                 className="btn btn-sm"
@@ -605,7 +637,7 @@ export default function Matches() {
                                                 <div className="match-versus">
                                                     <div
                                                         className={`match-player ${match.winnerId === match.player1Id ? 'winner' : ''}`}
-                                                        onClick={() => !loading && !isCompleted && p1 && p2 && handleSetWinner(match, match.player1Id)}
+                                                        onClick={() => !loading && !isCompleted && p1 && p2 && isAdmin && handleSetWinner(match, match.player1Id)}
                                                     >
                                                         <div className="player-avatar-sm" style={{ margin: '0 auto 6px', overflow: 'hidden' }}>
                                                             {p1?.photo ? <img src={p1.photo} alt={p1.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (p1 ? getInitials(p1.name) : '?')}
@@ -618,7 +650,7 @@ export default function Matches() {
                                                     <div className="match-vs">VS</div>
                                                     <div
                                                         className={`match-player ${match.winnerId === match.player2Id ? 'winner' : ''}`}
-                                                        onClick={() => !loading && !isCompleted && p1 && p2 && handleSetWinner(match, match.player2Id)}
+                                                        onClick={() => !loading && !isCompleted && p1 && p2 && isAdmin && handleSetWinner(match, match.player2Id)}
                                                     >
                                                         <div className="player-avatar-sm" style={{ margin: '0 auto 6px', overflow: 'hidden' }}>
                                                             {p2?.photo ? <img src={p2.photo} alt={p2.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (p2 ? getInitials(p2.name) : '?')}
@@ -629,14 +661,14 @@ export default function Matches() {
                                                         )}
                                                     </div>
                                                 </div>
-                                                {!isCompleted && p1 && p2 && (
+                                                {!isCompleted && p1 && p2 && isAdmin && (
                                                     <div style={{ textAlign: 'center', marginTop: 12 }}>
                                                         <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                                                             Clique no vencedor para registrar resultado
                                                         </span>
                                                     </div>
                                                 )}
-                                                {isCompleted && (
+                                                {isCompleted && isAdmin && (
                                                     <div style={{ textAlign: 'center', marginTop: 12 }}>
                                                         <button
                                                             className="btn btn-danger btn-sm"

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { getSeasons, getPlayers, closeSeason, getSelectives, deleteSeason } from '../data/db.js';
 import { getRankings } from '../data/rankingEngine.js';
 import { Calendar, Trophy, Medal, CheckCircle, Trash2, AlertTriangle, XCircle, Loader } from 'lucide-react';
+import { useAdmin } from '../contexts/AdminContext.jsx';
 
 export default function History() {
+    const { isAdmin } = useAdmin();
     const [seasons, setSeasons] = useState([]);
     const [activeSeason, setActiveSeason] = useState(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -103,7 +105,7 @@ export default function History() {
                     <h1 className="page-title">Histórico</h1>
                     <p className="page-subtitle">Temporadas e resultados anteriores</p>
                 </div>
-                {activeSeason?.status === 'active' && (
+                {activeSeason?.status === 'active' && isAdmin && (
                     <button className="btn btn-gold" onClick={handleCloseSeason} disabled={loading}>
                         <CheckCircle size={18} /> Fechar Temporada {activeSeason.year}
                     </button>
@@ -144,9 +146,11 @@ export default function History() {
                                     Temporada {activeSeason.year} – {activeSeason.status === 'active' ? 'Em Andamento' : 'Finalizada'}
                                 </span>
                             </div>
-                            <button className="btn btn-danger btn-sm" onClick={() => !loading && setDeleteConfirmOpen(true)} disabled={loading}>
-                                <Trash2 size={16} /> Apagar Temporada
-                            </button>
+                            {isAdmin && (
+                                <button className="btn btn-danger btn-sm" onClick={() => !loading && setDeleteConfirmOpen(true)} disabled={loading}>
+                                    <Trash2 size={16} /> Apagar Temporada
+                                </button>
+                            )}
                         </div>
                     </div>
 

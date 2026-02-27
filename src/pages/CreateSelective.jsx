@@ -3,6 +3,7 @@ import { getPlayers, createSelective, getSelectives, createMatch } from '../data
 import { generateMatchesForSelective } from '../data/tournamentEngine.js';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Check, Trophy, Flag } from 'lucide-react';
+import { useAdmin } from '../contexts/AdminContext.jsx';
 
 // Event type selector removed. Event defaults to 'seletiva'.
 
@@ -28,6 +29,7 @@ const MODES = [
 ];
 
 export default function CreateSelective() {
+    const { isAdmin } = useAdmin();
     const navigate = useNavigate();
     const [players, setPlayers] = useState([]);
     const [eventType] = useState('seletiva');
@@ -270,14 +272,20 @@ export default function CreateSelective() {
                     </div>
 
                     {/* Generate Button */}
-                    <button
-                        className="btn btn-gold btn-lg btn-block"
-                        onClick={handleGenerate}
-                        disabled={selectedPlayers.length < 2 || loading}
-                        style={{ opacity: (selectedPlayers.length < 2 || loading) ? 0.5 : 1 }}
-                    >
-                        <Zap size={20} /> {loading ? 'Criando...' : 'Gerar Confrontos Automaticamente'}
-                    </button>
+                    {isAdmin ? (
+                        <button
+                            className="btn btn-gold btn-lg btn-block"
+                            onClick={handleGenerate}
+                            disabled={selectedPlayers.length < 2 || loading}
+                            style={{ opacity: (selectedPlayers.length < 2 || loading) ? 0.5 : 1 }}
+                        >
+                            <Zap size={20} /> {loading ? 'Criando...' : 'Gerar Confrontos Automaticamente'}
+                        </button>
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: 12, color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 8, marginBottom: 12 }}>
+                            Apenas administradores podem iniciar novos eventos.
+                        </div>
+                    )}
                 </>
             )}
         </div>
