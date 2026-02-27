@@ -4,12 +4,14 @@ import { getSettings, updateSettings, resetCurrentRanking } from '../data/db.js'
 import { TrendingUp, TrendingDown, Minus, Settings, Crown, Award, Zap, Trophy, Star, Flame, Trash2, AlertTriangle, XCircle, Loader, HelpCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useAdmin } from '../contexts/AdminContext.jsx';
+import TiebreakerHelpModal from '../components/TiebreakerHelpModal.jsx';
 
 export default function Rankings() {
     const { isAdmin } = useAdmin();
     const [rankings, setRankingsList] = useState([]);
     const [settings, setSettingsState] = useState({ rankingMode: 'points' });
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [helpModalOpen, setHelpModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => { refresh(); }, []);
@@ -143,28 +145,15 @@ export default function Rankings() {
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Trophy size={28} style={{ color: 'var(--gold-400)' }} /> Ranking Geral
-                        <div className="tooltip-container" style={{ marginLeft: 4 }}>
-                            <HelpCircle size={18} className="tooltip-icon" />
-                            <div className="tooltip-text" style={{ fontWeight: 'normal', fontSize: 11, textAlign: 'left' }}>
-                                <strong style={{ color: 'var(--green-400)' }}>Como funciona o Ranking?</strong><br />
-                                {isElo ? (
-                                    <>
-                                        Sistema Rating ELO internacional.<br /><br />
-                                        Vitórias rendem ELO (máx +32), mas o quanto você ganha depende da força do adversário.
-                                        Derrotar um líder rende muito ELO! Perder para um novato tira muito ELO!
-                                    </>
-                                ) : (
-                                    <>
-                                        <strong>Critérios de Desempate (Ordem):</strong><br />
-                                        1. Mais Pontos (Vit=3, Der=0)<br />
-                                        2. Confronto Direto (Geral)<br />
-                                        3. Qualidade de Vitórias (Buchholz)<br />
-                                        4. Melhor Aproveitamento %<br />
-                                        5. Mais Vitórias
-                                    </>
-                                )}
-                            </div>
-                        </div>
+                        <button
+                            onClick={() => setHelpModalOpen(true)}
+                            style={{
+                                background: 'none', border: 'none', color: 'var(--text-muted)',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: 4
+                            }}
+                        >
+                            <HelpCircle size={18} />
+                        </button>
                     </h1>
                     <p className="page-subtitle">{rankings.length} jogadores classificados · {isElo ? 'ELO Rating' : 'Pontos Fixos'}</p>
                 </div>
@@ -689,6 +678,12 @@ export default function Rankings() {
                     </div>
                 </div>
             )}
+
+            <TiebreakerHelpModal
+                isOpen={helpModalOpen}
+                onClose={() => setHelpModalOpen(false)}
+                isElo={isElo}
+            />
         </div>
     );
 }

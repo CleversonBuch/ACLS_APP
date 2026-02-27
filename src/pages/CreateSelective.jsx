@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { getPlayers, createSelective, getSelectives, createMatch } from '../data/db.js';
 import { generateMatchesForSelective } from '../data/tournamentEngine.js';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Check, Trophy, Flag } from 'lucide-react';
+import { Zap, Check, Trophy, Flag, HelpCircle } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext.jsx';
+import TiebreakerHelpModal from '../components/TiebreakerHelpModal.jsx';
 
 // Event type selector removed. Event defaults to 'seletiva'.
 
@@ -31,6 +32,7 @@ const MODES = [
 export default function CreateSelective() {
     const { isAdmin } = useAdmin();
     const navigate = useNavigate();
+    const [helpModalOpen, setHelpModalOpen] = useState(false);
     const [players, setPlayers] = useState([]);
     const [eventType] = useState('seletiva');
     const [mode, setMode] = useState('round-robin');
@@ -222,14 +224,23 @@ export default function CreateSelective() {
                                     onChange={e => setConfig({ ...config, pointsPerLoss: parseInt(e.target.value) || 0 })}
                                 />
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">Critério de Desempate</label>
+                            <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    Critério de Desempate
+                                    <button
+                                        onClick={() => setHelpModalOpen(true)}
+                                        style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}
+                                        title="Entenda os critérios extras"
+                                    >
+                                        <HelpCircle size={14} />
+                                    </button>
+                                </label>
                                 <select
                                     className="form-select"
                                     value={config.tiebreaker}
                                     onChange={e => setConfig({ ...config, tiebreaker: e.target.value })}
                                 >
-                                    <option value="head-to-head">Confronto Direto</option>
+                                    <option value="head-to-head">Confronto Direto + Buccholz</option>
                                     <option value="win-rate">Aproveitamento</option>
                                     <option value="wins">Mais Vitórias</option>
                                 </select>
@@ -288,6 +299,12 @@ export default function CreateSelective() {
                     )}
                 </>
             )}
+
+            <TiebreakerHelpModal
+                isOpen={helpModalOpen}
+                onClose={() => setHelpModalOpen(false)}
+                isElo={false}
+            />
         </div>
     );
 }

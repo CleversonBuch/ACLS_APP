@@ -4,6 +4,7 @@ import { applyMatchResult, reverseMatchResult, getHeadToHeadResult } from '../da
 import { generateSwissRound } from '../data/tournamentEngine.js';
 import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext.jsx';
+import TiebreakerHelpModal from '../components/TiebreakerHelpModal.jsx';
 
 export default function Matches() {
     const { isAdmin } = useAdmin();
@@ -14,6 +15,7 @@ export default function Matches() {
     const [loading, setLoading] = useState(true);
     const [refresh, setRefresh] = useState(0);
     const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
+    const [helpModalOpen, setHelpModalOpen] = useState(false);
 
     useEffect(() => {
         async function loadData() {
@@ -448,17 +450,15 @@ export default function Matches() {
                             <div className="card-header">
                                 <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     📊 Resultado da Seletiva
-                                    <div className="tooltip-container">
-                                        <HelpCircle size={14} className="tooltip-icon" />
-                                        <div className="tooltip-text">
-                                            <strong style={{ color: 'var(--green-400)' }}>Critérios de Desempate (Ordem):</strong><br />
-                                            1. Mais Pontos<br />
-                                            2. Confronto Direto<br />
-                                            3. Qualidade de Vit. (Buchholz)<br />
-                                            4. Mais Vitórias<br />
-                                            5. Menos Derrotas
-                                        </div>
-                                    </div>
+                                    <button
+                                        onClick={() => setHelpModalOpen(true)}
+                                        style={{
+                                            background: 'none', border: 'none', color: 'var(--text-muted)',
+                                            cursor: 'pointer', display: 'flex', alignItems: 'center'
+                                        }}
+                                    >
+                                        <HelpCircle size={14} />
+                                    </button>
                                 </h3>
                                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                                     {activeSelective?.config?.pointsPerWin ?? 3} pts/vitória · {activeSelective?.config?.pointsPerLoss ?? 0} pts/derrota
@@ -772,6 +772,12 @@ export default function Matches() {
                     </div>
                 )
             }
+
+            <TiebreakerHelpModal
+                isOpen={helpModalOpen}
+                onClose={() => setHelpModalOpen(false)}
+                isElo={false}
+            />
         </div >
     );
 }

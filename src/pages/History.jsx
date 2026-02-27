@@ -83,6 +83,12 @@ export default function History() {
     const champion = activeSeason?.championId ? playersMap[activeSeason.championId] : null;
     const vice = activeSeason?.viceId ? playersMap[activeSeason.viceId] : null;
     const finalRanking = activeSeason?.finalRanking || [];
+
+    // Obter 3º lugar diretamente do Final Ranking caso a temporada esteja finalizada
+    let thirdPlace = null;
+    if (activeSeason?.status === 'completed' && finalRanking.length >= 3) {
+        thirdPlace = playersMap[finalRanking[2].playerId];
+    }
     const seasonSelectives = selectives.filter(s => s.seasonId === activeSeason?.id);
 
     function getInitials(name) {
@@ -154,39 +160,57 @@ export default function History() {
                         </div>
                     </div>
 
-                    {/* Champion & Vice (if completed) */}
+                    {/* Champion, Vice & 3rd Place (if completed) */}
                     {activeSeason.status === 'completed' && champion && (
-                        <div className="grid-2" style={{ marginBottom: 20 }}>
-                            <div className="card card-gold" style={{ textAlign: 'center', padding: 32 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: thirdPlace ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 20, marginBottom: 20 }}>
+                            <div className="card card-gold" style={{ textAlign: 'center', padding: '32px 16px' }}>
                                 <div style={{ fontSize: 48, marginBottom: 8 }}>🏆</div>
                                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, color: 'var(--gold-400)', textTransform: 'uppercase', letterSpacing: 1 }}>
                                     Campeão
                                 </div>
                                 <div className="player-card-avatar" style={{ margin: '12px auto' }}>
-                                    {getInitials(champion.name)}
+                                    {champion.photo ? <img src={champion.photo} alt={champion.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(champion.name)}
                                 </div>
-                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--gold-400)' }}>
+                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--gold-400)' }}>
                                     {champion.name}
                                 </div>
                                 {champion.nickname && (
-                                    <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>"{champion.nickname}"</div>
+                                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>"{champion.nickname}"</div>
                                 )}
                             </div>
 
                             {vice && (
-                                <div className="card" style={{ textAlign: 'center', padding: 32 }}>
+                                <div className="card" style={{ textAlign: 'center', padding: '32px 16px' }}>
                                     <div style={{ fontSize: 40, marginBottom: 8 }}>🥈</div>
                                     <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, color: 'var(--silver)', textTransform: 'uppercase', letterSpacing: 1 }}>
                                         Vice-Campeão
                                     </div>
                                     <div className="player-card-avatar" style={{ margin: '12px auto', borderColor: 'var(--silver)' }}>
-                                        {getInitials(vice.name)}
+                                        {vice.photo ? <img src={vice.photo} alt={vice.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(vice.name)}
                                     </div>
-                                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--silver)' }}>
+                                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--silver)' }}>
                                         {vice.name}
                                     </div>
                                     {vice.nickname && (
-                                        <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>"{vice.nickname}"</div>
+                                        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>"{vice.nickname}"</div>
+                                    )}
+                                </div>
+                            )}
+
+                            {thirdPlace && (
+                                <div className="card" style={{ textAlign: 'center', padding: '32px 16px' }}>
+                                    <div style={{ fontSize: 32, marginBottom: 8 }}>🥉</div>
+                                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 12, color: 'var(--bronze)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                                        Terceiro Lugar
+                                    </div>
+                                    <div className="player-card-avatar" style={{ margin: '12px auto', borderColor: 'var(--bronze)' }}>
+                                        {thirdPlace.photo ? <img src={thirdPlace.photo} alt={thirdPlace.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(thirdPlace.name)}
+                                    </div>
+                                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--bronze)' }}>
+                                        {thirdPlace.name}
+                                    </div>
+                                    {thirdPlace.nickname && (
+                                        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>"{thirdPlace.nickname}"</div>
                                     )}
                                 </div>
                             )}
@@ -221,7 +245,9 @@ export default function History() {
                                                 </td>
                                                 <td>
                                                     <div className="player-cell">
-                                                        <div className="player-avatar-sm">{getInitials(player.name)}</div>
+                                                        <div className="player-avatar-sm">
+                                                            {player.photo ? <img src={player.photo} alt={player.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(player.name)}
+                                                        </div>
                                                         <div>
                                                             <div className="player-info-name">{player.name}</div>
                                                             <div className="player-info-nickname">{player.nickname}</div>
