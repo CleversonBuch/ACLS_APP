@@ -3,10 +3,10 @@ import { getPlayers, createPlayer, updatePlayer, deletePlayer, getPlayerStageSta
 import { getWinRate, getRankings } from '../data/rankingEngine.js';
 import { UserPlus, X, Edit, Trash2, Search, Upload, Camera, Loader, Flame, Trophy, Target, Zap, Award, HelpCircle } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext.jsx';
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 
 // ─── Mini Radar Chart ────────────────────────────────────────
-function PlayerRadar({ player }) {
+function PlayerRadar({ player, leagueStats }) {
     const wins = player.wins || 0;
     const losses = player.losses || 0;
     const total = wins + losses;
@@ -14,16 +14,20 @@ function PlayerRadar({ player }) {
     const streak = player.streak || 0;
     const bestStreak = player.bestStreak || 0;
     const points = player.points || 0;
-    const maxPoints = 100; // scale reference
 
-    // Normalise all dims 0-100
+    const maxW = leagueStats?.maxWins || 1;
+    const maxS = leagueStats?.maxStreak || 1;
+    const maxP = leagueStats?.maxPoints || 1;
+    const maxG = leagueStats?.maxGames || 1;
+
+    // Normalise all dims exactly 0-100 compared to the best in the league
     const data = [
-        { subject: 'Vitórias',   A: Math.min(100, wins * 5) },
+        { subject: 'Vitórias',   A: Math.min(100, (wins / maxW) * 100) },
         { subject: 'Aproveit.',  A: Math.round(wr) },
-        { subject: 'Sequência',  A: Math.min(100, streak * 10) },
-        { subject: 'Melhor Seq', A: Math.min(100, bestStreak * 8) },
-        { subject: 'Pontos',     A: Math.min(100, points > 0 ? (points / Math.max(points, maxPoints)) * 100 : 0) },
-        { subject: 'Jogos',      A: Math.min(100, total * 4) },
+        { subject: 'Sequência',  A: Math.min(100, (streak / maxS) * 100) },
+        { subject: 'Melhor Seq', A: Math.min(100, (bestStreak / maxS) * 100) },
+        { subject: 'Pontos',     A: Math.min(100, (points / maxP) * 100) },
+        { subject: 'Jogos',      A: Math.min(100, (total / maxG) * 100) },
     ];
 
     return (
@@ -34,6 +38,7 @@ function PlayerRadar({ player }) {
                     dataKey="subject"
                     tick={{ fill: 'rgba(148,163,184,0.7)', fontSize: 9, fontWeight: 500 }}
                 />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                 <Radar
                     dataKey="A"
                     stroke="#10b981"
@@ -84,7 +89,7 @@ function StatPill({ label, value, color = 'var(--text-primary)', icon }) {
 }
 
 // ─── Player Card ─────────────────────────────────────────────
-function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading }) {
+function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueStats }) {
     const wins   = player.wins || 0;
     const losses = player.losses || 0;
     const total  = wins + losses;
@@ -214,7 +219,7 @@ function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading }) {
                 <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: 1.5, color: 'var(--text-dim)', textTransform: 'uppercase', textAlign: 'center', marginBottom: 2 }}>
                     Perfil de Desempenho
                 </div>
-                <PlayerRadar player={player} />
+                <PlayerRadar player={player} leagueStats={leagueStats} />
             </div>
 
             {/* Secondary stats */}
@@ -396,6 +401,13 @@ export default function Players() {
         (p.nickname && p.nickname.toLowerCase().includes(search.toLowerCase()))
     );
 
+    const leagueStats = {
+        maxWins: Math.max(1, ...players.map(p => p.wins || 0)),
+        maxGames: Math.max(1, ...players.map(p => (p.wins || 0) + (p.losses || 0))),
+        maxPoints: Math.max(1, ...players.map(p => p.points || 0)),
+        maxStreak: Math.max(1, ...players.map(p => p.bestStreak || 0))
+    };
+
     return (
         <div className="animate-fade-in">
             <div className="page-header">
@@ -511,6 +523,7 @@ export default function Players() {
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             loading={loading}
+                            leagueStats={leagueStats}
                         />
                     ))}
                 </div>
