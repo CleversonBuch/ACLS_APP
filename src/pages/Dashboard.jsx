@@ -37,7 +37,13 @@ export default function Dashboard() {
     const isElo = settings.rankingMode === 'elo';
 
     // Chart data - use real evolution from pointsHistory
-    const top5Players = rankings.slice(0, 5);
+    const validSelectiveNames = new Set(selectives.map(s => s.name));
+    const top5Players = rankings.slice(0, 5).map(p => ({
+        ...p,
+        pointsHistory: Array.isArray(p.pointsHistory) 
+            ? p.pointsHistory.filter(h => validSelectiveNames.has(h.eventName))
+            : []
+    }));
     let chartData = [];
 
     if (top5Players.length > 0) {

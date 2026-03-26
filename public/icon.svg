@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0f172a" rx="100"/>
+  <circle cx="256" cy="220" r="160" fill="#f8fafc"/>
+  <text x="256" y="260" font-family="Arial, sans-serif" font-weight="900" font-size="120" fill="#0f172a" text-anchor="middle">8</text>
+  <text x="256" y="440" font-family="Arial, sans-serif" font-weight="800" font-size="52" fill="#10b981" text-anchor="middle" letter-spacing="4">A.C.L.S</text>
+</svg>

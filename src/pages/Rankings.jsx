@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getRankings, getWinRate, getPlayerScore } from '../data/rankingEngine.js';
-import { getSettings, updateSettings, resetCurrentRanking } from '../data/db.js';
+import { getSettings, updateSettings, resetCurrentRanking, getSelectives } from '../data/db.js';
 import { TrendingUp, TrendingDown, Minus, Settings, Crown, Award, Zap, Trophy, Star, Flame, Trash2, AlertTriangle, XCircle, Loader, HelpCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useAdmin } from '../contexts/AdminContext.jsx';
@@ -10,6 +10,7 @@ export default function Rankings() {
     const { isAdmin } = useAdmin();
     const [rankings, setRankingsList] = useState([]);
     const [settings, setSettingsState] = useState({ rankingMode: 'points' });
+    const [selectivesList, setSelectivesList] = useState([]);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [helpModalOpen, setHelpModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -18,9 +19,10 @@ export default function Rankings() {
 
     async function refresh() {
         setLoading(true);
-        const [r, s] = await Promise.all([getRankings(), getSettings()]);
+        const [r, s, sel] = await Promise.all([getRankings(), getSettings(), getSelectives()]);
         setRankingsList(r);
         if (s) setSettingsState(s);
+        setSelectivesList(sel);
         setLoading(false);
     }
 
@@ -57,7 +59,13 @@ export default function Rankings() {
     // Chart
     const lineColors = ['#10b981', '#fbbf24', '#60a5fa', '#f87171', '#a78bfa'];
     let chartData = [];
-    const top5Players = rankings.slice(0, 5);
+    const validSelectiveNames = new Set(selectivesList.map(s => s.name));
+    const top5Players = rankings.slice(0, 5).map(p => ({
+        ...p,
+        pointsHistory: Array.isArray(p.pointsHistory) 
+            ? p.pointsHistory.filter(h => validSelectiveNames.has(h.eventName))
+            : []
+    }));
 
     if (top5Players.length > 0) {
         const allEventsMap = new Map();
