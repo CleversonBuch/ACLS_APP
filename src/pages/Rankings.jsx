@@ -472,11 +472,12 @@ export default function Rankings() {
                                                 {p.nickname && (
                                                     <div style={{ fontSize: 12, color: 'var(--green-400)' }}>"{p.nickname}"</div>
                                                 )}
-                                                <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
                                                     <span><span style={{ color: 'var(--green-400)', fontWeight: 600 }}>{p.wins || 0}</span> V</span>
                                                     <span><span style={{ color: 'var(--red-400)', fontWeight: 600 }}>{p.losses || 0}</span> D</span>
+                                                    <span><span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{(p.wins || 0) + (p.losses || 0)}</span> J</span>
                                                     <span>{getWinRate(p)}%</span>
-                                                    {p.streak > 0 && <span style={{ color: 'var(--gold-400)' }}>🔥{p.streak}</span>}
+                                                    {p.streak > 0 && <span style={{ color: 'var(--gold-400)' }}>🔥 {p.streak}</span>}
                                                 </div>
                                             </div>
 
@@ -607,39 +608,32 @@ export default function Rankings() {
                                                 ) : getInitials(p.name)}
                                             </div>
 
-                                            {/* Name */}
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</div>
-                                                {p.nickname && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.nickname}</div>}
+                                            {/* Name & Stats combined to save horizontal space */}
+                                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</span>
+                                                    {p.nickname && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>"{p.nickname}"</span>}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                                                    <span><span style={{ color: 'var(--green-400)' }}>{p.wins || 0}</span>V</span>
+                                                    <span><span style={{ color: 'var(--red-400)' }}>{p.losses || 0}</span>D</span>
+                                                    <span>{(p.wins || 0) + (p.losses || 0)}J</span>
+                                                    <span>{getWinRate(p)}%</span>
+                                                </div>
                                             </div>
 
-                                            {/* Quick stats */}
-                                            <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>
-                                                <span><span style={{ color: 'var(--green-400)', fontWeight: 600 }}>{p.wins || 0}</span>V</span>
-                                                <span><span style={{ color: 'var(--red-400)', fontWeight: 600 }}>{p.losses || 0}</span>D</span>
-                                                <span>{getWinRate(p)}%</span>
-                                            </div>
-
-                                            {/* Score */}
-                                            <div style={{
-                                                fontFamily: 'var(--font-display)',
-                                                fontSize: 18,
-                                                fontWeight: 700,
-                                                color: 'var(--text-secondary)',
-                                                width: 60,
-                                                textAlign: 'right',
-                                                flexShrink: 0
-                                            }}>
-                                                {getScore(p)}
-                                            </div>
-
-                                            {/* Streak */}
-                                            <div style={{ width: 32, textAlign: 'center', flexShrink: 0 }}>
-                                                {p.streak > 0 ? (
-                                                    <span style={{ color: 'var(--gold-400)', fontSize: 12, fontWeight: 600 }}>🔥{p.streak}</span>
-                                                ) : (
-                                                    <span style={{ color: 'var(--text-dim)' }}>–</span>
-                                                )}
+                                            {/* Score & Streak Grouped */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--green-400)' }}>
+                                                    {getScore(p)} <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 500 }}>{isElo ? 'ELO' : 'PTS'}</span>
+                                                </div>
+                                                <div>
+                                                    {p.streak > 0 ? (
+                                                        <span style={{ color: 'var(--gold-400)', fontSize: 11, fontWeight: 600 }}>🔥 {p.streak} Seq</span>
+                                                    ) : (
+                                                        <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>-</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     );
