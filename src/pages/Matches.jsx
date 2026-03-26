@@ -17,6 +17,7 @@ export default function Matches() {
     const [refresh, setRefresh] = useState(0);
     const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
     const [helpModalOpen, setHelpModalOpen] = useState(false);
+    const [aiModalOpen, setAiModalOpen] = useState(false);
 
     useEffect(() => {
         async function loadData() {
@@ -631,6 +632,16 @@ export default function Matches() {
                             <div className="card-header">
                                 <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <BrainCircuit size={16} className="text-green" /> Módulo Dinâmico IA
+                                    <button
+                                        onClick={() => setAiModalOpen(true)}
+                                        style={{
+                                            background: 'none', border: 'none', color: 'var(--text-muted)',
+                                            cursor: 'pointer', display: 'flex', alignItems: 'center'
+                                        }}
+                                        title="Como funciona a IA?"
+                                    >
+                                        <HelpCircle size={14} />
+                                    </button>
                                 </h3>
                                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Chances de Top 5</span>
                             </div>
@@ -914,6 +925,42 @@ export default function Matches() {
                     </div>
                 )
             }
+
+            {/* ── Modal Módulo IA ── */}
+            {aiModalOpen && (
+                <div className="modal-overlay" onClick={() => setAiModalOpen(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+                        <div className="modal-header">
+                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--green-400)' }}>
+                                <BrainCircuit size={20} /> Como funciona a IA?
+                            </h3>
+                            <button className="modal-close" onClick={() => setAiModalOpen(false)}>
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body" style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
+                            <p style={{ marginBottom: 16 }}>
+                                O <strong>Módulo Dinâmico de IA</strong> realiza previsões avançadas sobre as chances de cada jogador terminar a seletiva no <strong>Top 5</strong>.
+                            </p>
+                            <div style={{ background: 'var(--bg-elevated)', padding: 16, borderRadius: 8, marginBottom: 16 }}>
+                                <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
+                                    <li style={{ marginBottom: 12 }}>
+                                        <strong>🎲 Simulação de Monte Carlo</strong><br />
+                                        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>A IA joga o restante do torneio <strong>800 vezes</strong> em frações de segundo, testando todas as combinações possíveis de vitórias e derrotas para as partidas que ainda não aconteceram.</span>
+                                    </li>
+                                    <li>
+                                        <strong>📊 Probabilidade Real</strong><br />
+                                        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Se um jogador se classifica em 400 das 800 simulações, sua chance real matemática de classificação é calculada exatamente como 50%.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                                Apenas estatística pura e direta, atualizada em tempo real de forma dinâmica após cada resultado inserido.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <TiebreakerHelpModal
                 isOpen={helpModalOpen}

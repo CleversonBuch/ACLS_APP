@@ -14,26 +14,23 @@ export async function applyFixedPoints(winnerId, loserId, config = {}) {
     const winner = players.find(p => p.id === winnerId);
     if (!winner) return;
 
-    // Update winner
-    const newWinStreak = (winner.streak > 0 ? winner.streak : 0) + 1;
+    // Update winner (points only, stats handled by rebuild)
     await updatePlayer(winnerId, {
-        wins: (winner.wins || 0) + 1,
-        points: (winner.points || 0) + pointsPerWin,
-        streak: newWinStreak,
-        bestStreak: Math.max(winner.bestStreak || 0, newWinStreak)
+        points: (winner.points || 0) + pointsPerWin
     });
 
-    // Update loser (only if internal player)
+    // Update loser (points only, stats handled by rebuild)
     if (loserId) {
         const loser = players.find(p => p.id === loserId);
         if (loser) {
             await updatePlayer(loserId, {
-                losses: (loser.losses || 0) + 1,
-                points: (loser.points || 0) + pointsPerLoss,
-                streak: 0
+                points: (loser.points || 0) + pointsPerLoss
             });
         }
     }
+
+    await rebuildPlayerStats(winnerId);
+    if (loserId) await rebuildPlayerStats(loserId);
 }
 
 // ============================================
@@ -60,21 +57,18 @@ export async function applyEloRating(winnerId, loserId) {
     const newWinnerRating = Math.round(winnerRating + K_FACTOR * (1 - expectedWin));
     const newLoserRating = Math.round(loserRating + K_FACTOR * (0 - expectedLose));
 
-    // Update winner
-    const newWinStreak = (winner.streak > 0 ? winner.streak : 0) + 1;
+    // Update winner (Elo only, stats handled by rebuild)
     await updatePlayer(winnerId, {
-        wins: (winner.wins || 0) + 1,
-        eloRating: newWinnerRating,
-        streak: newWinStreak,
-        bestStreak: Math.max(winner.bestStreak || 0, newWinStreak)
+        eloRating: newWinnerRating
     });
 
-    // Update loser
+    // Update loser (Elo only, stats handled by rebuild)
     await updatePlayer(loserId, {
-        losses: (loser.losses || 0) + 1,
-        eloRating: Math.max(100, newLoserRating), // Floor at 100
-        streak: 0
+        eloRating: Math.max(100, newLoserRating) // Floor at 100
     });
+
+    await rebuildPlayerStats(winnerId);
+    if (loserId) await rebuildPlayerStats(loserId);
 }
 
 // ============================================
@@ -97,23 +91,20 @@ export async function applyMatchResult(winnerId, loserId, config = {}) {
     const newWinnerRating = Math.round(winnerRating + K_FACTOR * (1 - expectedWin));
     const newLoserRating = Math.round(loserRating + K_FACTOR * (0 - expectedLose));
 
-    // Update winner (both systems + stats)
-    const newWinStreak = (winner.streak > 0 ? winner.streak : 0) + 1;
+    // Update winner (both systems points, stats handled by rebuild)
     await updatePlayer(winnerId, {
-        wins: (winner.wins || 0) + 1,
         points: (winner.points || 0) + pointsPerWin,
-        eloRating: newWinnerRating,
-        streak: newWinStreak,
-        bestStreak: Math.max(winner.bestStreak || 0, newWinStreak)
+        eloRating: newWinnerRating
     });
 
-    // Update loser (both systems + stats)
+    // Update loser (both systems points, stats handled by rebuild)
     await updatePlayer(loserId, {
-        losses: (loser.losses || 0) + 1,
         points: (loser.points || 0) + pointsPerLoss,
-        eloRating: Math.max(100, newLoserRating),
-        streak: 0
+        eloRating: Math.max(100, newLoserRating)
     });
+
+    await rebuildPlayerStats(winnerId);
+    if (loserId) await rebuildPlayerStats(loserId);
 }
 
 // ============================================
@@ -135,20 +126,63 @@ export async function reverseMatchResult(winnerId, loserId, config = {}) {
     const winnerDelta = Math.round(K_FACTOR * (1 - expected));
     const loserDelta = Math.round(K_FACTOR * expected);
 
-    // Reverse winner (both systems + stats)
+    // Reverse winner (points only, stats handled by rebuild)
     await updatePlayer(winnerId, {
-        wins: Math.max(0, (winner.wins || 0) - 1),
         points: Math.max(0, (winner.points || 0) - pointsPerWin),
-        eloRating: Math.max(100, winnerRating - winnerDelta),
-        streak: 0
+        eloRating: Math.max(100, winnerRating - winnerDelta)
     });
 
-    // Reverse loser (both systems + stats)
+    // Reverse loser (points only, stats handled by rebuild)
     await updatePlayer(loserId, {
-        losses: Math.max(0, (loser.losses || 0) - 1),
         points: Math.max(0, (loser.points || 0) - pointsPerLoss),
-        eloRating: loserRating + loserDelta,
-        streak: 0
+        eloRating: loserRating + loserDelta
+    });
+
+    await rebuildPlayerStats(winnerId);
+    if (loserId) await rebuildPlayerStats(loserId);
+}
+
+// ============================================
+// Robust Player Stats Rebuilder
+// ============================================
+export async function rebuildPlayerStats(playerId) {
+    if (!playerId) return;
+    const players = await getPlayers();
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
+
+    const allMatches = await getAll('matches');
+    
+    // Sort player matches chronologically (by createdAt or ID)
+    const playerMatches = allMatches
+        .filter(m => m.status === 'completed' && (m.player1Id === playerId || Math.player2Id === playerId || m.player2Id === playerId))
+        .sort((a, b) => {
+            const timeA = new Date(a.createdAt || a.scheduledTime || 0).getTime();
+            const timeB = new Date(b.createdAt || b.scheduledTime || 0).getTime();
+            return timeA - timeB;
+        });
+
+    let wins = 0;
+    let losses = 0;
+    let streak = 0;
+    let bestStreak = 0;
+
+    for (const m of playerMatches) {
+        if (m.winnerId === playerId) {
+            wins++;
+            streak++;
+            if (streak > bestStreak) bestStreak = streak;
+        } else if (m.winnerId) {
+            losses++;
+            streak = 0;
+        }
+    }
+
+    await updatePlayer(playerId, {
+        wins,
+        losses,
+        streak,
+        bestStreak
     });
 }
 
