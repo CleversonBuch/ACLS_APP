@@ -161,7 +161,7 @@ textarea {
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  z-index: 100;
+  z-index: 9999;
   transition: transform var(--transition-normal);
 }
 
@@ -264,7 +264,7 @@ textarea {
   height: 56px;
   background: var(--bg-dark);
   border-bottom: 1px solid var(--border-subtle);
-  z-index: 99;
+  z-index: 9990;
   padding: 0 16px;
   align-items: center;
   justify-content: space-between;
@@ -274,7 +274,10 @@ textarea {
   background: none;
   border: none;
   color: var(--text-primary);
-  padding: 8px;
+  padding: 12px;
+  margin-left: -12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .mobile-brand {
@@ -289,7 +292,7 @@ textarea {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
-  z-index: 99;
+  z-index: 9995;
 }
 
 /* ============================================
@@ -1511,11 +1514,15 @@ textarea {
   }
 
   .sidebar.open {
-    transform: translateX(0);
+    transform: translateX(0) !important;
+  }
+
+  .sidebar-overlay {
+    display: none;
   }
 
   .sidebar-overlay.open {
-    display: block;
+    display: block !important;
   }
 
   .mobile-header {
