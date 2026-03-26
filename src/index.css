@@ -1583,6 +1583,46 @@ textarea {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .ranking-table th {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .ranking-table td {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .player-cell {
+    gap: 6px;
+  }
+
+  .player-avatar-sm {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+
+  .player-info-name {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+  }
+
+  .player-info-nickname {
+    font-size: 9px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+  }
+
+  .win-rate-bar {
+    display: none;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1598,10 +1638,21 @@ textarea {
     font-size: 22px;
   }
 
-  .ranking-table {
-    font-size: 13px;
+  .ranking-table th {
+    padding: 4px 6px;
+    font-size: 9px;
   }
-  
+
+  .ranking-table td {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .player-info-name {
+    font-size: 11px;
+    max-width: 60px;
+  }
+
   .hide-mobile {
     display: none !important;
   }

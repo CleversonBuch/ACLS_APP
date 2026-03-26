@@ -616,8 +616,8 @@ export default function Rankings() {
                                             {/* Quick stats */}
                                             <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>
                                                 <span><span style={{ color: 'var(--green-400)', fontWeight: 600 }}>{p.wins || 0}</span>V</span>
-                                                <span className="hide-mobile"><span style={{ color: 'var(--red-400)', fontWeight: 600 }}>{p.losses || 0}</span>D</span>
-                                                <span className="hide-mobile">{getWinRate(p)}%</span>
+                                                <span><span style={{ color: 'var(--red-400)', fontWeight: 600 }}>{p.losses || 0}</span>D</span>
+                                                <span>{getWinRate(p)}%</span>
                                             </div>
 
                                             {/* Score */}
