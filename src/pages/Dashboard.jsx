@@ -307,9 +307,9 @@ export default function Dashboard() {
                                     <th>#</th>
                                     <th>Jogador</th>
                                     <th>{isElo ? 'ELO' : 'Pontos'}</th>
-                                    <th>V</th>
-                                    <th>D</th>
-                                    <th>%</th>
+                                    <th className="hide-mobile">V</th>
+                                    <th className="hide-mobile">D</th>
+                                    <th className="hide-mobile">%</th>
                                     <th>Seq.</th>
                                 </tr>
                             </thead>
@@ -333,9 +333,9 @@ export default function Dashboard() {
                                         <td style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--green-400)' }}>
                                             {isElo ? player.eloRating || 1000 : player.points || 0}
                                         </td>
-                                        <td style={{ color: 'var(--green-400)' }}>{player.wins || 0}</td>
-                                        <td style={{ color: 'var(--red-400)' }}>{player.losses || 0}</td>
-                                        <td>{getWinRate(player)}%</td>
+                                        <td className="hide-mobile" style={{ color: 'var(--green-400)' }}>{player.wins || 0}</td>
+                                        <td className="hide-mobile" style={{ color: 'var(--red-400)' }}>{player.losses || 0}</td>
+                                        <td className="hide-mobile">{getWinRate(player)}%</td>
                                         <td>
                                             {player.streak > 0 ? (
                                                 <span className="trend-up">🔥 {player.streak}</span>

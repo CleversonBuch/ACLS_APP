@@ -547,8 +547,8 @@ export default function Matches() {
                                             <th>Jogador</th>
                                             <th>V</th>
                                             <th>D</th>
-                                            <th>J</th>
-                                            <th>Aprov.</th>
+                                            <th className="hide-mobile">J</th>
+                                            <th className="hide-mobile">Aprov.</th>
                                             <th>Pts</th>
                                         </tr>
                                     </thead>
@@ -576,8 +576,8 @@ export default function Matches() {
                                                     </td>
                                                     <td style={{ color: 'var(--green-400)', fontWeight: 600, background: zoneBg }}>{s.wins}</td>
                                                     <td style={{ color: 'var(--red-400)', fontWeight: 600, background: zoneBg }}>{s.losses}</td>
-                                                    <td style={{ color: 'var(--text-secondary)', background: zoneBg }}>{total}</td>
-                                                    <td style={{ background: zoneBg }}>
+                                                    <td className="hide-mobile" style={{ color: 'var(--text-secondary)', background: zoneBg }}>{total}</td>
+                                                    <td className="hide-mobile" style={{ background: zoneBg }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                             <span>{rate}%</span>
                                                             <div className="win-rate-bar" style={{ width: 50 }}>

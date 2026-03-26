@@ -1601,6 +1601,10 @@ textarea {
   .ranking-table {
     font-size: 13px;
   }
+  
+  .hide-mobile {
+    display: none !important;
+  }
 }
 
 /* ============================================

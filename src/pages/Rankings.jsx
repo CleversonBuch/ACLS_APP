@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getRankings, getWinRate, getPlayerScore } from '../data/rankingEngine.js';
-import { getSettings, updateSettings, resetCurrentRanking, getSelectives } from '../data/db.js';
+import { getRankings, getWinRate, getPlayerScore, rebuildPlayerStats } from '../data/rankingEngine.js';
+import { getSettings, updateSettings, resetCurrentRanking, getSelectives, getPlayers } from '../data/db.js';
 import { TrendingUp, TrendingDown, Minus, Settings, Crown, Award, Zap, Trophy, Star, Flame, Trash2, AlertTriangle, XCircle, Loader, HelpCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useAdmin } from '../contexts/AdminContext.jsx';
@@ -30,6 +30,16 @@ export default function Rankings() {
         setLoading(true);
         await resetCurrentRanking();
         setDeleteConfirmOpen(false);
+        await refresh();
+    }
+
+    async function handleRecalculate() {
+        if (!confirm('Isto irá recalcular todas as estatísticas (sequências, etc) de todos os jogadores. Continuar?')) return;
+        setLoading(true);
+        const players = await getPlayers();
+        for (const p of players) {
+            await rebuildPlayerStats(p.id);
+        }
         await refresh();
     }
 
@@ -175,9 +185,14 @@ export default function Rankings() {
                                 ELO Rating
                             </button>
                         </div>
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmOpen(true)}>
-                            <Trash2 size={16} /> Apagar Dados
-                        </button>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn btn-secondary btn-sm" onClick={handleRecalculate}>
+                                Recalcular Stats
+                            </button>
+                            <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmOpen(true)}>
+                                <Trash2 size={16} /> Apagar Dados
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -601,8 +616,8 @@ export default function Rankings() {
                                             {/* Quick stats */}
                                             <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>
                                                 <span><span style={{ color: 'var(--green-400)', fontWeight: 600 }}>{p.wins || 0}</span>V</span>
-                                                <span><span style={{ color: 'var(--red-400)', fontWeight: 600 }}>{p.losses || 0}</span>D</span>
-                                                <span>{getWinRate(p)}%</span>
+                                                <span className="hide-mobile"><span style={{ color: 'var(--red-400)', fontWeight: 600 }}>{p.losses || 0}</span>D</span>
+                                                <span className="hide-mobile">{getWinRate(p)}%</span>
                                             </div>
 
                                             {/* Score */}
