@@ -157,9 +157,20 @@ export async function rebuildPlayerStats(playerId) {
     const playerMatches = allMatches
         .filter(m => m.status === 'completed' && (m.player1Id === playerId || m.player2Id === playerId))
         .sort((a, b) => {
-            const timeA = new Date(a.updatedAt || a.createdAt || a.scheduledTime || 0).getTime();
-            const timeB = new Date(b.updatedAt || b.createdAt || b.scheduledTime || 0).getTime();
-            if (timeA === timeB) return a.id.localeCompare(b.id);
+            // Sort matches firmly by creation time so historical edits (updatedAt) don't scramble the timeline
+            const timeA = new Date(a.createdAt || a.scheduledTime || 0).getTime();
+            const timeB = new Date(b.createdAt || b.scheduledTime || 0).getTime();
+            
+            // If they were created at almost the exact same time (e.g. round-robin batch creation)
+            if (Math.abs(timeA - timeB) < 5000) {
+                // Secondary fallback to tournament round numbers for correct sequence
+                const roundA = parseInt(a.round) || 0;
+                const roundB = parseInt(b.round) || 0;
+                if (roundA !== roundB) return roundA - roundB;
+                
+                return a.id.localeCompare(b.id);
+            }
+            
             return timeA - timeB;
         });
 
