@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -28,6 +28,23 @@ const navItems = [
 
 export default function Sidebar() {
     const [open, setOpen] = useState(false);
+    const [installable, setInstallable] = useState(false);
+
+    useEffect(() => {
+        if (window.deferredPrompt) setInstallable(true);
+        const handlePwaReady = () => setInstallable(true);
+        window.addEventListener('pwa-ready', handlePwaReady);
+        return () => window.removeEventListener('pwa-ready', handlePwaReady);
+    }, []);
+
+    const handleInstallClick = async () => {
+        if (!window.deferredPrompt) return;
+        window.deferredPrompt.prompt();
+        const { outcome } = await window.deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setInstallable(false);
+        }
+    };
 
     return (
         <>
@@ -80,6 +97,17 @@ export default function Sidebar() {
                     ))}
 
                     <div style={{ margin: '16px 0', borderTop: '1px solid var(--border-subtle)' }} />
+
+                    {installable && (
+                        <button 
+                            className="sidebar-link" 
+                            style={{ width: '100%', border: 'none', background: 'rgba(16, 185, 129, 0.12)', cursor: 'pointer', color: 'var(--green-400)', fontWeight: 600, marginBottom: 4 }}
+                            onClick={handleInstallClick}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 12 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Instalar App
+                        </button>
+                    )}
 
                     <button 
                         className="sidebar-link" 

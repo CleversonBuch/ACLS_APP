@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSelective, deleteSelective, createMatch, updatePlayer } from '../data/db.js';
 import { applyMatchResult, reverseMatchResult, getHeadToHeadResult } from '../data/rankingEngine.js';
 import { generateSwissRound } from '../data/tournamentEngine.js';
-import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle, Target, TrendingUp, Sparkles, BrainCircuit } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useAdmin } from '../contexts/AdminContext.jsx';
 import TiebreakerHelpModal from '../components/TiebreakerHelpModal.jsx';
 
@@ -372,6 +373,79 @@ export default function Matches() {
         });
     })();
 
+    // ── Compute AI Classification Chances (Monte Carlo) ──
+    const top5Chances = (() => {
+        if (!activeSelective || matches.length === 0 || standings.length === 0) return {};
+        const config = activeSelective.config || {};
+        const ptsWin = config.pointsPerWin ?? 3;
+        const ptsLoss = config.pointsPerLoss ?? 0;
+        
+        const pendingMatches = matches.filter(m => m.status !== 'completed' && m.player1Id && m.player2Id);
+        const chances = {};
+        standings.forEach(s => chances[s.id] = 0);
+        
+        if (pendingMatches.length === 0) {
+            standings.slice(0, 5).forEach(s => chances[s.id] = 100);
+            return chances;
+        }
+
+        const SIMULATIONS = 800;
+        for (let i = 0; i < SIMULATIONS; i++) {
+            const simPoints = {};
+            standings.forEach(s => simPoints[s.id] = s.points);
+            
+            pendingMatches.forEach(pm => {
+                const winner = Math.random() < 0.5 ? pm.player1Id : pm.player2Id;
+                const loser = winner === pm.player1Id ? pm.player2Id : pm.player1Id;
+                simPoints[winner] += ptsWin;
+                simPoints[loser] += ptsLoss;
+            });
+            
+            const simResult = standings.map(s => ({ id: s.id, points: simPoints[s.id] })).sort((a,b) => b.points - a.points);
+            for(let rank = 0; rank < 5 && rank < simResult.length; rank++) {
+                chances[simResult[rank].id]++;
+            }
+        }
+        
+        Object.keys(chances).forEach(id => {
+            chances[id] = Math.round((chances[id] / SIMULATIONS) * 100);
+        });
+        return chances;
+    })();
+
+    // ── Compute LineChart Data (Points per round strictly for this selective) ──
+    const chartLineColors = ['#10b981', '#fbbf24', '#60a5fa', '#f87171', '#a78bfa', '#f472b6', '#34d399', '#818cf8'];
+    const selectiveChartData = (() => {
+        if (!activeSelective || matches.length === 0 || standings.length === 0) return [];
+        const completedMatches = matches.filter(m => m.status === 'completed' && m.winnerId);
+        if (completedMatches.length === 0) return [];
+        
+        const config = activeSelective.config || {};
+        const ptsWin = config.pointsPerWin ?? 3;
+        const ptsLoss = config.pointsPerLoss ?? 0;
+        const maxRoundPlayed = Math.max(...completedMatches.map(m => m.round || 1));
+        
+        const data = [{ name: 'Início', ...Object.fromEntries(standings.map(s => [s.nickname || s.name, 0])) }];
+        const playerAcc = {};
+        standings.forEach(s => playerAcc[s.nickname || s.name] = 0);
+        
+        for (let r = 1; r <= maxRoundPlayed; r++) {
+            const rMatches = completedMatches.filter(m => m.round === r);
+            rMatches.forEach(m => {
+                const winnerIdx = standings.find(x => x.id === m.winnerId);
+                const loserId = m.winnerId === m.player1Id ? m.player2Id : m.player1Id;
+                const loserIdx = standings.find(x => x.id === loserId);
+                if (winnerIdx) playerAcc[winnerIdx.nickname || winnerIdx.name] += ptsWin;
+                if (loserIdx) playerAcc[loserIdx.nickname || loserIdx.name] += ptsLoss;
+            });
+            
+            const point = { name: `Rod ${r}` };
+            standings.forEach(s => point[s.nickname || s.name] = playerAcc[s.nickname || s.name]);
+            data.push(point);
+        }
+        return data;
+    })();
+
     if (loading && Object.keys(playersMap).length === 0) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-dim)' }}>
@@ -519,6 +593,74 @@ export default function Matches() {
                                                         }}>
                                                             {s.points}
                                                         </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Line Chart of Current Selective ── */}
+                    {selectiveChartData.length > 0 && (
+                        <div className="card" style={{ marginBottom: 20 }}>
+                            <div className="card-header">
+                                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <TrendingUp size={16} style={{ color: 'var(--blue-400)' }} /> Desempenho (Desta Seletiva)
+                                </h3>
+                            </div>
+                            <ResponsiveContainer width="100%" height={180}>
+                                <LineChart data={selectiveChartData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.06)" />
+                                    <XAxis dataKey="name" tick={{ fill: '#475569', fontSize: 10 }} />
+                                    <YAxis tick={{ fill: '#475569', fontSize: 10 }} />
+                                    <Tooltip contentStyle={{ background: '#1a2332', border: '1px solid rgba(148,163,184,0.12)', borderRadius: 8, fontSize: 12, color: '#f1f5f9' }} />
+                                    {standings.slice(0, 8).map((p, i) => (
+                                        <Line key={p.id} type="monotone" dataKey={p.nickname || p.name} stroke={chartLineColors[i % chartLineColors.length]} strokeWidth={2} dot={true} connectNulls />
+                                    ))}
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+
+                    {/* ── AI Classification Chances Table ── */}
+                    {standings.length > 0 && progress < 100 && (
+                        <div className="card" style={{ marginBottom: 20, background: 'linear-gradient(to right, rgba(16,185,129,0.03), var(--bg-card))', borderLeft: '3px solid var(--green-500)' }}>
+                            <div className="card-header">
+                                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <BrainCircuit size={16} className="text-green" /> Módulo Dinâmico IA
+                                </h3>
+                                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Chances de Top 5</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="ranking-table" style={{ fontSize: 13 }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Jogador</th>
+                                            <th>Pontos Atuais</th>
+                                            <th>Chance Real (%)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {standings.map((s, i) => {
+                                            const chance = top5Chances[s.id] || 0;
+                                            let color = 'var(--red-400)';
+                                            if (chance > 80) color = 'var(--green-400)';
+                                            else if (chance > 40) color = 'var(--gold-400)';
+                                            
+                                            return (
+                                                <tr key={s.id}>
+                                                    <td>{s.nickname || s.name}</td>
+                                                    <td style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{s.points} pts</td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                            <span style={{ color, fontWeight: 700, width: 34 }}>{chance}%</span>
+                                                            <div style={{ height: 6, flex: 1, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden', minWidth: 60 }}>
+                                                                <div style={{ height: '100%', width: `${chance}%`, background: color }} />
+                                                            </div>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
