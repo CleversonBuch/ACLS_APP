@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getPlayers, createPlayer, updatePlayer, deletePlayer, getPlayerStageStats, getPlayerExternalStats } from '../data/db.js';
 import { getWinRate, getRankings } from '../data/rankingEngine.js';
-import { UserPlus, X, Edit, Trash2, Search, Upload, Camera, Loader, Flame, Trophy, Target, Zap, Award } from 'lucide-react';
+import { UserPlus, X, Edit, Trash2, Search, Upload, Camera, Loader, Flame, Trophy, Target, Zap, Award, HelpCircle } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext.jsx';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -324,6 +324,7 @@ export default function Players() {
     const [showModal, setShowModal] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState(null);
     const [search, setSearch] = useState('');
+    const [showHelp, setShowHelp] = useState(false);
     const [form, setForm] = useState({ name: '', nickname: '', photo: '' });
     const [photoMode, setPhotoMode] = useState('upload');
 
@@ -398,9 +399,77 @@ export default function Players() {
     return (
         <div className="animate-fade-in">
             <div className="page-header">
-                <div>
-                    <h1 className="page-title">Jogadores</h1>
-                    <p className="page-subtitle">{players.length} jogadores cadastrados</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+                    <div>
+                        <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            Jogadores
+                            <button
+                                onClick={() => setShowHelp(v => !v)}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0, marginTop: 2 }}
+                                title="Como ler o card?"
+                            >
+                                <HelpCircle size={18} />
+                            </button>
+                        </h1>
+                        <p className="page-subtitle">{players.length} jogadores cadastrados</p>
+                    </div>
+
+                    {/* Floating help panel */}
+                    {showHelp && (
+                        <div
+                            onClick={() => setShowHelp(false)}
+                            style={{
+                                position: 'fixed', inset: 0, zIndex: 999,
+                                background: 'rgba(0,0,0,0.4)',
+                                display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-start',
+                                paddingTop: 80, paddingLeft: 24,
+                            }}
+                        >
+                            <div
+                                onClick={e => e.stopPropagation()}
+                                style={{
+                                    background: 'var(--bg-card)',
+                                    border: '1px solid rgba(16,185,129,0.25)',
+                                    borderRadius: 16,
+                                    padding: '20px 22px',
+                                    maxWidth: 340,
+                                    width: '90vw',
+                                    boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+                                    position: 'relative',
+                                }}
+                            >
+                                <button
+                                    onClick={() => setShowHelp(false)}
+                                    style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
+                                >
+                                    <X size={16} />
+                                </button>
+
+                                <h4 style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700, color: 'var(--green-400)', marginBottom: 14, letterSpacing: 1, textTransform: 'uppercase' }}>
+                                    📖 Como ler o card
+                                </h4>
+
+                                {[
+                                    { icon: '🔥', label: 'Badge de Sequência (canto direito)', desc: 'Quantas vitórias consecutivas o jogador tem no momento.' },
+                                    { icon: '🏅', label: 'Vitórias / Derrotas / Jogos', desc: 'Totais de partidas registradas na liga.' },
+                                    { icon: '📊', label: 'Aproveitamento %', desc: 'Percentual de vitórias em relação ao total de jogos.' },
+                                    { icon: '🕸️', label: 'Radar — Perfil de Desempenho', desc: 'Gráfico com 6 dimensões normalizadas (0–100). Vitórias, Aproveit., Sequência Atual, Melhor Sequência, Pontos e Jogos. Quanto maior a área preenchida, mais completo o jogador.' },
+                                    { icon: '🟢', label: 'Pontos', desc: 'Pontos acumulados no sistema de pontos fixos (vitória = 3 pts).' },
+                                    { icon: '🔵', label: 'ELO Rating', desc: 'Classificação pelo sistema ELO. Começa em 1000. Sobe ao bater rivais fortes.' },
+                                    { icon: '🏆', label: 'Seq. Atual / Melhor Seq.', desc: 'Sequência ativa agora e o recorde histórico de vitórias consecutivas.' },
+                                    { icon: '⭐', label: 'Borda colorida', desc: '🥇 Ouro = 1º lugar · 🥈 Prata = 2º lugar · 🥉 Bronze = 3º lugar.' },
+                                ].map(({ icon, label, desc }) => (
+                                    <div key={label} style={{ marginBottom: 12, display: 'flex', gap: 10 }}>
+                                        <div style={{ fontSize: 16, flexShrink: 0, paddingTop: 1 }}>{icon}</div>
+                                        <div>
+                                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{label}</div>
+                                            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>{desc}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
                 {isAdmin && (
                     <button className="btn btn-primary" onClick={() => { setEditingPlayer(null); setForm({ name: '', nickname: '', photo: '' }); setShowModal(true); }}>
