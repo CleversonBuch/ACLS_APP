@@ -136,10 +136,16 @@ textarea {
 
 .main-content {
   flex: 1;
+  min-width: 0;
   margin-left: var(--sidebar-width);
   padding: 24px 32px;
   min-height: 100vh;
   transition: margin-left var(--transition-normal);
+}
+
+.overflow-x-auto {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ============================================

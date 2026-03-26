@@ -153,12 +153,13 @@ export async function rebuildPlayerStats(playerId) {
 
     const allMatches = await getAll('matches');
     
-    // Sort player matches chronologically (by createdAt or ID)
+    // Sort player matches chronologically (by updatedAt, createdAt or ID)
     const playerMatches = allMatches
-        .filter(m => m.status === 'completed' && (m.player1Id === playerId || Math.player2Id === playerId || m.player2Id === playerId))
+        .filter(m => m.status === 'completed' && (m.player1Id === playerId || m.player2Id === playerId))
         .sort((a, b) => {
-            const timeA = new Date(a.createdAt || a.scheduledTime || 0).getTime();
-            const timeB = new Date(b.createdAt || b.scheduledTime || 0).getTime();
+            const timeA = new Date(a.updatedAt || a.createdAt || a.scheduledTime || 0).getTime();
+            const timeB = new Date(b.updatedAt || b.createdAt || b.scheduledTime || 0).getTime();
+            if (timeA === timeB) return a.id.localeCompare(b.id);
             return timeA - timeB;
         });
 
