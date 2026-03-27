@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSelective, deleteSelective, createMatch, updatePlayer } from '../data/db.js';
 import { applyMatchResult, reverseMatchResult, getHeadToHeadResult } from '../data/rankingEngine.js';
 import { generateSwissRound } from '../data/tournamentEngine.js';
-import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle, Target, TrendingUp, Sparkles, BrainCircuit } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle, Target, TrendingUp, Sparkles, BrainCircuit, Swords, Activity, Zap } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useAdmin } from '../contexts/AdminContext.jsx';
 import TiebreakerHelpModal from '../components/TiebreakerHelpModal.jsx';
 
@@ -380,11 +380,11 @@ export default function Matches() {
         const config = activeSelective.config || {};
         const ptsWin = config.pointsPerWin ?? 3;
         const ptsLoss = config.pointsPerLoss ?? 0;
-        
+
         const pendingMatches = matches.filter(m => m.status !== 'completed' && m.player1Id && m.player2Id);
         const chances = {};
         standings.forEach(s => chances[s.id] = 0);
-        
+
         if (pendingMatches.length === 0) {
             standings.slice(0, 5).forEach(s => chances[s.id] = 100);
             return chances;
@@ -394,20 +394,20 @@ export default function Matches() {
         for (let i = 0; i < SIMULATIONS; i++) {
             const simPoints = {};
             standings.forEach(s => simPoints[s.id] = s.points);
-            
+
             pendingMatches.forEach(pm => {
                 const winner = Math.random() < 0.5 ? pm.player1Id : pm.player2Id;
                 const loser = winner === pm.player1Id ? pm.player2Id : pm.player1Id;
                 simPoints[winner] += ptsWin;
                 simPoints[loser] += ptsLoss;
             });
-            
-            const simResult = standings.map(s => ({ id: s.id, points: simPoints[s.id] })).sort((a,b) => b.points - a.points);
-            for(let rank = 0; rank < 5 && rank < simResult.length; rank++) {
+
+            const simResult = standings.map(s => ({ id: s.id, points: simPoints[s.id] })).sort((a, b) => b.points - a.points);
+            for (let rank = 0; rank < 5 && rank < simResult.length; rank++) {
                 chances[simResult[rank].id]++;
             }
         }
-        
+
         Object.keys(chances).forEach(id => {
             chances[id] = Math.round((chances[id] / SIMULATIONS) * 100);
         });
@@ -420,16 +420,16 @@ export default function Matches() {
         if (!activeSelective || matches.length === 0 || standings.length === 0) return [];
         const completedMatches = matches.filter(m => m.status === 'completed' && m.winnerId);
         if (completedMatches.length === 0) return [];
-        
+
         const config = activeSelective.config || {};
         const ptsWin = config.pointsPerWin ?? 3;
         const ptsLoss = config.pointsPerLoss ?? 0;
         const maxRoundPlayed = Math.max(...completedMatches.map(m => m.round || 1));
-        
+
         const data = [{ name: 'Início', ...Object.fromEntries(standings.map(s => [s.nickname || s.name, 0])) }];
         const playerAcc = {};
         standings.forEach(s => playerAcc[s.nickname || s.name] = 0);
-        
+
         for (let r = 1; r <= maxRoundPlayed; r++) {
             const rMatches = completedMatches.filter(m => m.round === r);
             rMatches.forEach(m => {
@@ -439,7 +439,7 @@ export default function Matches() {
                 if (winnerIdx) playerAcc[winnerIdx.nickname || winnerIdx.name] += ptsWin;
                 if (loserIdx) playerAcc[loserIdx.nickname || loserIdx.name] += ptsLoss;
             });
-            
+
             const point = { name: `Rod ${r}` };
             standings.forEach(s => point[s.nickname || s.name] = playerAcc[s.nickname || s.name]);
             data.push(point);
@@ -449,235 +449,217 @@ export default function Matches() {
 
     if (loading && Object.keys(playersMap).length === 0) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text-dim)' }}>
-                <Loader className="animate-spin" size={32} style={{ marginBottom: 16 }} />
-                <p>Carregando chaves da seletiva...</p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 16 }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', border: '3px solid rgba(52,211,153,0.15)', borderTopColor: '#34d399', animation: 'spin 0.8s linear infinite' }} />
+                <p style={{ color: '#64748b', fontSize: 14, fontWeight: 500 }}>Carregando seletivas...</p>
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
         );
     }
 
     return (
-        <div className="animate-fade-in" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-            <div className="page-header">
+        <div style={{ opacity: loading ? 0.65 : 1, transition: 'opacity 0.25s', animation: 'fadeInUp 0.4s ease' }}>
+            <style>{`
+                @keyframes fadeInUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+                @keyframes spin{to{transform:rotate(360deg)}}
+                .sel-tab:hover{background:rgba(52,211,153,0.08)!important;color:#e2e8f0!important;}
+                .match-row-hover:hover{background:rgba(52,211,153,0.04)!important;transform:translateX(1px);}
+                .match-row-hover{transition:all 0.18s ease!important;}
+                .bracket-match-new:hover{border-color:rgba(52,211,153,0.3)!important;box-shadow:0 4px 20px rgba(0,0,0,0.3)!important;}
+            `}</style>
+
+            {/* ── Header ── */}
+            <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
                 <div>
-                    <h1 className="page-title">Confrontos</h1>
-                    <p className="page-subtitle">Definir resultados das partidas</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                        <div style={{ width: 6, height: 32, borderRadius: 3, background: 'linear-gradient(180deg, #60a5fa, #3b82f6)' }} />
+                        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800, color: '#f1f5f9', margin: 0, letterSpacing: -0.5, display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Swords size={24} color="#60a5fa" /> Seletivas
+                        </h1>
+                    </div>
+                    <p style={{ color: '#475569', fontSize: 14, marginLeft: 16 }}>Confrontos e resultados das partidas</p>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {activeSelective && isAdmin && (
-                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirmStep(1)}>
-                            <Trash2 size={16} /> Apagar Seletiva
+                        <button onClick={() => setDeleteConfirmStep(1)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)', color: '#f87171', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                            <Trash2 size={14} /> Apagar Seletiva
                         </button>
                     )}
                     {activeSelective?.status === 'active' && canComplete && isAdmin && (
-                        <button className="btn btn-gold" onClick={handleCompleteSelective}>
-                            <CheckCircle size={18} /> Finalizar Seletiva
+                        <button onClick={handleCompleteSelective} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 10, border: '1px solid rgba(251,191,36,0.3)', background: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(245,158,11,0.1))', color: '#fbbf24', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 0 20px rgba(251,191,36,0.1)' }}>
+                            <CheckCircle size={16} /> Finalizar Seletiva
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* Selective Selector */}
+            {/* ── Selective Tabs ── */}
             {selectives.length > 0 && (
-                <div className="season-tabs" style={{ marginBottom: 20 }}>
-                    {selectives.map(s => (
-                        <button
-                            key={s.id}
-                            className={`season-tab ${activeSelectiveId === s.id ? 'active' : ''}`}
-                            onClick={() => setActiveSelectiveId(s.id)}
-                            disabled={loading}
-                        >
-                            {s.name} {s.status === 'completed' ? '✅' : '🔵'}
-                        </button>
-                    ))}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
+                    {selectives.map(s => {
+                        const isActive = activeSelectiveId === s.id;
+                        const isDone = s.status === 'completed';
+                        return (
+                            <button key={s.id} className="sel-tab" onClick={() => setActiveSelectiveId(s.id)} disabled={loading} style={{
+                                padding: '8px 16px', borderRadius: 12, border: `1px solid ${isActive ? 'rgba(96,165,250,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                                background: isActive ? 'linear-gradient(135deg, rgba(96,165,250,0.15), rgba(59,130,246,0.08))' : 'rgba(255,255,255,0.03)',
+                                color: isActive ? '#60a5fa' : '#64748b',
+                                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 6,
+                                boxShadow: isActive ? '0 0 16px rgba(96,165,250,0.1)' : 'none',
+                                transition: 'all 0.2s',
+                            }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: isDone ? '#34d399' : '#60a5fa', flexShrink: 0 }} />
+                                {s.name}
+                                {isDone && <span style={{ fontSize: 9, fontWeight: 800, color: '#34d399', background: 'rgba(52,211,153,0.12)', padding: '1px 6px', borderRadius: 6 }}>FINALIZADA</span>}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
 
             {activeSelective && (
                 <>
-                    {/* Progress Bar */}
-                    <div className="card" style={{ marginBottom: 20 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <span style={{ fontSize: 14, fontWeight: 600 }}>
-                                Progresso: {completedCount}/{totalMatches} partidas
-                            </span>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--green-400)' }}>{progress}%</span>
+                    {/* ── Progress Bar ── */}
+                    <div style={{ background: 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: '1px solid rgba(96,165,250,0.12)', borderRadius: 18, padding: '18px 22px', marginBottom: 20, position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #60a5fa, transparent)' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Activity size={15} color="#60a5fa" />
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8' }}>Progresso</span>
+                                <span style={{ fontSize: 12, color: '#475569' }}>{completedCount}/{totalMatches} partidas</span>
+                            </div>
+                            <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 900, color: progress === 100 ? '#34d399' : '#60a5fa', letterSpacing: -1 }}>{progress}%</span>
                         </div>
-                        <div style={{
-                            height: 8,
-                            background: 'var(--bg-elevated)',
-                            borderRadius: 999,
-                            overflow: 'hidden'
-                        }}>
-                            <div style={{
-                                height: '100%',
-                                width: `${progress}%`,
-                                background: 'linear-gradient(90deg, var(--green-500), var(--green-400))',
-                                borderRadius: 999,
-                                transition: 'width 0.4s ease'
-                            }} />
+                        <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 999, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${progress}%`, background: progress === 100 ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #3b82f6, #60a5fa)', borderRadius: 999, transition: 'width 0.5s ease', boxShadow: progress > 0 ? `0 0 12px ${progress === 100 ? 'rgba(52,211,153,0.4)' : 'rgba(96,165,250,0.4)'}` : 'none' }} />
                         </div>
                     </div>
 
-                    {/* ── Resultado por Seletiva ── */}
+                    {/* ── Standings ── */}
                     {standings.length > 0 && completedCount > 0 && (
-                        <div className="card" style={{ marginBottom: 20 }}>
-                            <div className="card-header">
-                                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    📊 Resultado da Seletiva
-                                    <button
-                                        onClick={() => setHelpModalOpen(true)}
-                                        style={{
-                                            background: 'none', border: 'none', color: 'var(--text-muted)',
-                                            cursor: 'pointer', display: 'flex', alignItems: 'center'
-                                        }}
-                                    >
-                                        <HelpCircle size={14} />
-                                    </button>
-                                </h3>
-                                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                                    {activeSelective?.config?.pointsPerWin ?? 3} pts/vitória · {activeSelective?.config?.pointsPerLoss ?? 0} pts/derrota
+                        <div style={{ background: 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: '1px solid rgba(148,163,184,0.08)', borderRadius: 20, overflow: 'hidden', marginBottom: 20, position: 'relative' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(148,163,184,0.3), transparent)' }} />
+                            <div style={{ padding: '16px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 17 }}>📊</span>
+                                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>Resultado da Seletiva</span>
+                                    <button onClick={() => setHelpModalOpen(true)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 4 }}><HelpCircle size={14} /></button>
+                                </div>
+                                <span style={{ fontSize: 11, color: '#475569', background: 'rgba(255,255,255,0.04)', padding: '3px 10px', borderRadius: 20 }}>
+                                    {activeSelective?.config?.pointsPerWin ?? 3}pts/V · {activeSelective?.config?.pointsPerLoss ?? 0}pts/D
                                 </span>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="ranking-table">
-                                    <thead>
-                                        <tr>
-                                            <th style={{ width: 50 }}>#</th>
-                                            <th>Jogador</th>
-                                            <th>V</th>
-                                            <th>D</th>
-                                            <th>J</th>
-                                            <th>Aprov.</th>
-                                            <th>Pts</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {standings.map((s, i) => {
-                                            const total = s.wins + s.losses;
-                                            const rate = total > 0 ? Math.round((s.wins / total) * 100) : 0;
-                                            const zoneColor = i < 5 ? '#10b981' : i === 5 ? '#f59e0b' : '#ef4444';
-                                            const zoneBg = i < 5 ? 'rgba(16,185,129,0.15)' : i === 5 ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.15)';
-                                            return (
-                                                <tr key={s.id}>
-                                                    <td style={{ background: zoneBg, borderLeft: `4px solid ${zoneColor}` }}>
-                                                        <div className={`rank-position ${i === 0 ? 'top-1' : i === 1 ? 'top-2' : i === 2 ? 'top-3' : ''}`}>
-                                                            {i + 1}
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ background: zoneBg }}>
-                                                        <div className="player-cell">
-                                                            <div className="player-avatar-sm" style={{ overflow: 'hidden' }}>{s.photo ? <img src={s.photo} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : getInitials(s.name)}</div>
-                                                            <div>
-                                                                <div className="player-info-name">{s.name}</div>
-                                                                {s.nickname && <div className="player-info-nickname">{s.nickname}</div>}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ color: 'var(--green-400)', fontWeight: 600, background: zoneBg }}>{s.wins}</td>
-                                                    <td style={{ color: 'var(--red-400)', fontWeight: 600, background: zoneBg }}>{s.losses}</td>
-                                                    <td style={{ color: 'var(--text-secondary)', background: zoneBg }}>{total}</td>
-                                                    <td style={{ background: zoneBg }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                            <span>{rate}%</span>
-                                                            <div className="win-rate-bar" style={{ width: 50 }}>
-                                                                <div className="win-rate-fill" style={{ width: `${rate}%` }} />
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ background: zoneBg }}>
-                                                        <span style={{
-                                                            fontFamily: 'var(--font-display)',
-                                                            fontWeight: 700,
-                                                            fontSize: 16,
-                                                            color: zoneColor
-                                                        }}>
-                                                            {s.points}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                            {/* Table header */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 44px 44px 44px 70px 64px', padding: '6px 20px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: 0.8, borderBottom: '1px solid rgba(148,163,184,0.06)' }}>
+                                <span>#</span><span>Jogador</span><span style={{ textAlign: 'center' }}>V</span><span style={{ textAlign: 'center' }}>D</span><span style={{ textAlign: 'center' }}>J</span><span style={{ textAlign: 'center' }}>Aprov.</span><span style={{ textAlign: 'center' }}>Pts</span>
                             </div>
+                            {standings.map((s, i) => {
+                                const total = s.wins + s.losses;
+                                const rate = total > 0 ? Math.round((s.wins / total) * 100) : 0;
+                                const isClassing = i < 5;
+                                const isBubble = i === 5;
+                                const rowColor = isClassing ? '#34d399' : isBubble ? '#f59e0b' : '#f87171';
+                                const medalMap = ['🥇', '🥈', '🥉'];
+                                return (
+                                    <div key={s.id} className="match-row-hover" style={{ display: 'grid', gridTemplateColumns: '44px 1fr 44px 44px 44px 70px 64px', alignItems: 'center', padding: '10px 20px', borderBottom: `1px solid rgba(148,163,184,0.04)`, borderLeft: `3px solid ${rowColor}22`, background: isClassing ? `rgba(52,211,153,0.03)` : 'transparent' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, background: `${rowColor}15`, fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13, color: rowColor }}>
+                                            {i < 3 ? medalMap[i] : i + 1}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${rowColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: rowColor, flexShrink: 0, overflow: 'hidden' }}>
+                                                {s.photo ? <img src={s.photo} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(s.name)}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>{s.name}</div>
+                                                {s.nickname && <div style={{ fontSize: 10, color: rowColor, opacity: 0.8 }}>{s.nickname}</div>}
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'center', color: '#34d399', fontWeight: 700, fontSize: 14 }}>{s.wins}</div>
+                                        <div style={{ textAlign: 'center', color: '#f87171', fontWeight: 700, fontSize: 14 }}>{s.losses}</div>
+                                        <div style={{ textAlign: 'center', color: '#64748b', fontSize: 13 }}>{total}</div>
+                                        <div style={{ textAlign: 'center' }}>
+                                            <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden', marginBottom: 3 }}>
+                                                <div style={{ height: '100%', width: `${rate}%`, background: rowColor, borderRadius: 99 }} />
+                                            </div>
+                                            <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>{rate}%</span>
+                                        </div>
+                                        <div style={{ textAlign: 'center', fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 18, color: rowColor, textShadow: `0 0 10px ${rowColor}40` }}>{s.points}</div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 
-                    {/* ── Line Chart of Current Selective ── */}
+                    {/* ── Chart ── */}
                     {selectiveChartData.length > 0 && (
-                        <div className="card" style={{ marginBottom: 20 }}>
-                            <div className="card-header">
-                                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <TrendingUp size={16} style={{ color: 'var(--blue-400)' }} /> Desempenho (Desta Seletiva)
-                                </h3>
-                            </div>
-                            <ResponsiveContainer width="100%" height={180}>
-                                <LineChart data={selectiveChartData}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.06)" />
-                                    <XAxis dataKey="name" tick={{ fill: '#475569', fontSize: 10 }} />
-                                    <YAxis tick={{ fill: '#475569', fontSize: 10 }} />
-                                    <Tooltip contentStyle={{ background: '#1a2332', border: '1px solid rgba(148,163,184,0.12)', borderRadius: 8, fontSize: 12, color: '#f1f5f9' }} />
+                        <div style={{ background: 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: '1px solid rgba(96,165,250,0.1)', borderRadius: 20, overflow: 'hidden', marginBottom: 20, position: 'relative' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #60a5fa, transparent)' }} />
+                            <div style={{ padding: '16px 20px 8px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <TrendingUp size={16} color="#60a5fa" />
+                                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>Desempenho</span>
+                                <span style={{ fontSize: 11, color: '#475569', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 20 }}>Desta Seletiva</span>
+                                <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                                     {standings.slice(0, 8).map((p, i) => (
-                                        <Line key={p.id} type="monotone" dataKey={p.nickname || p.name} stroke={chartLineColors[i % chartLineColors.length]} strokeWidth={2} dot={true} connectNulls />
+                                        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <div style={{ width: 7, height: 7, borderRadius: '50%', background: chartLineColors[i % chartLineColors.length], boxShadow: `0 0 5px ${chartLineColors[i % chartLineColors.length]}80` }} />
+                                            <span style={{ fontSize: 10, color: '#64748b' }}>{p.nickname || p.name?.split(' ')[0]}</span>
+                                        </div>
                                     ))}
-                                </LineChart>
-                            </ResponsiveContainer>
+                                </div>
+                            </div>
+                            <div style={{ padding: '0 8px 16px' }}>
+                                <ResponsiveContainer width="100%" height={200}>
+                                    <AreaChart data={selectiveChartData} margin={{ top: 8, right: 16, bottom: 0, left: -10 }}>
+                                        <defs>
+                                            {chartLineColors.map((c, i) => (
+                                                <linearGradient key={i} id={`sg${i}`} x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor={c} stopOpacity={0.18} />
+                                                    <stop offset="95%" stopColor={c} stopOpacity={0} />
+                                                </linearGradient>
+                                            ))}
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.05)" />
+                                        <XAxis dataKey="name" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} width={35} />
+                                        <Tooltip contentStyle={{ background: 'rgba(10,14,23,0.95)', border: '1px solid rgba(96,165,250,0.2)', borderRadius: 10, fontSize: 11, color: '#f1f5f9' }} />
+                                        {standings.slice(0, 8).map((p, i) => (
+                                            <Area key={p.id} type="monotone" dataKey={p.nickname || p.name} stroke={chartLineColors[i % chartLineColors.length]} strokeWidth={2} fill={`url(#sg${i})`} dot={{ r: 3, fill: chartLineColors[i % chartLineColors.length], stroke: '#0a0e17', strokeWidth: 1.5 }} activeDot={{ r: 5 }} connectNulls />
+                                        ))}
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
                     )}
 
-                    {/* ── AI Classification Chances Table ── */}
+                    {/* ── AI Module ── */}
                     {standings.length > 0 && progress < 100 && (
-                        <div className="card" style={{ marginBottom: 20, background: 'linear-gradient(to right, rgba(16,185,129,0.03), var(--bg-card))', borderLeft: '3px solid var(--green-500)' }}>
-                            <div className="card-header">
-                                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <BrainCircuit size={16} className="text-green" /> Módulo Dinâmico IA
-                                    <button
-                                        onClick={() => setAiModalOpen(true)}
-                                        style={{
-                                            background: 'none', border: 'none', color: 'var(--text-muted)',
-                                            cursor: 'pointer', display: 'flex', alignItems: 'center'
-                                        }}
-                                        title="Como funciona a IA?"
-                                    >
-                                        <HelpCircle size={14} />
-                                    </button>
-                                </h3>
-                                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Chances de Top 5</span>
+                        <div style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.05), rgba(15,20,32,0.98))', border: '1px solid rgba(52,211,153,0.15)', borderLeft: '3px solid #10b981', borderRadius: 20, overflow: 'hidden', marginBottom: 20, position: 'relative' }}>
+                            <div style={{ padding: '16px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <BrainCircuit size={16} color="#34d399" />
+                                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>Módulo Dinâmico IA</span>
+                                    <button onClick={() => setAiModalOpen(true)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 4 }}><HelpCircle size={13} /></button>
+                                </div>
+                                <span style={{ fontSize: 11, color: '#34d399', background: 'rgba(52,211,153,0.1)', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>Chances Top 5</span>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="ranking-table" style={{ fontSize: 13 }}>
-                                    <thead>
-                                        <tr>
-                                            <th>Jogador</th>
-                                            <th>Pontos Atuais</th>
-                                            <th>Chance Real (%)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {standings.map((s, i) => {
-                                            const chance = top5Chances[s.id] || 0;
-                                            let color = 'var(--red-400)';
-                                            if (chance > 80) color = 'var(--green-400)';
-                                            else if (chance > 40) color = 'var(--gold-400)';
-                                            
-                                            return (
-                                                <tr key={s.id}>
-                                                    <td>{s.nickname || s.name}</td>
-                                                    <td style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{s.points} pts</td>
-                                                    <td>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                            <span style={{ color, fontWeight: 700, width: 34 }}>{chance}%</span>
-                                                            <div style={{ height: 6, flex: 1, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden', minWidth: 60 }}>
-                                                                <div style={{ height: '100%', width: `${chance}%`, background: color }} />
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                            <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {standings.map(s => {
+                                    const chance = top5Chances[s.id] || 0;
+                                    const color = chance > 80 ? '#34d399' : chance > 40 ? '#fbbf24' : '#f87171';
+                                    return (
+                                        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color, flexShrink: 0, overflow: 'hidden' }}>
+                                                {s.photo ? <img src={s.photo} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(s.name)}
+                                            </div>
+                                            <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', width: 100, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.nickname || s.name}</div>
+                                            <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden' }}>
+                                                <div style={{ height: '100%', width: `${chance}%`, background: color, borderRadius: 99, transition: 'width 0.4s ease', boxShadow: `0 0 8px ${color}60` }} />
+                                            </div>
+                                            <span style={{ fontSize: 13, fontWeight: 800, color, width: 38, textAlign: 'right', flexShrink: 0 }}>{chance}%</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -685,72 +667,67 @@ export default function Matches() {
                     {/* Matches */}
                     {isElimination ? (
                         // Bracket View for Elimination
-                        <div className="bracket-container">
+                        <div style={{ display: 'flex', gap: 32, overflowX: 'auto', padding: '10px 10px 32px' }}>
                             {Object.entries(rounds).map(([roundNum, roundMatches]) => {
                                 const totalRoundsCount = Object.keys(rounds).length;
                                 const rn = parseInt(roundNum);
-                                const roundLabel = rn === totalRoundsCount ? '🏆 Final' :
-                                    rn === totalRoundsCount - 1 ? 'Semifinal' :
-                                        rn === totalRoundsCount - 2 && totalRoundsCount > 3 ? 'Quartas de Final' :
-                                            `Rodada ${roundNum}`;
-
-                                // Filter out BYE-only matches? No, we want to show them now so it's clear everyone starts in Round 1.
+                                const roundLabel = rn === totalRoundsCount ? '🏆 Final' : rn === totalRoundsCount - 1 ? 'Semifinal' : rn === totalRoundsCount - 2 && totalRoundsCount > 3 ? 'Quartas de Final' : `Rodada ${roundNum}`;
                                 const visibleMatches = roundMatches;
-
                                 if (visibleMatches.length === 0) return null;
 
                                 return (
-                                    <div key={roundNum} className="bracket-round">
-                                        <div className="bracket-round-title">{roundLabel}</div>
+                                    <div key={roundNum} style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 260 }}>
+                                        <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', padding: '6px 16px', borderRadius: 99 }}>
+                                                <Target size={14} color="#60a5fa" />
+                                                <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: 1 }}>{roundLabel}</span>
+                                            </div>
+                                        </div>
                                         {visibleMatches.map(match => {
                                             const p1 = match.player1Id ? playersMap[match.player1Id] : null;
                                             const p2 = match.player2Id ? playersMap[match.player2Id] : null;
                                             const bothReady = match.player1Id && match.player2Id;
                                             const canPlay = bothReady && match.status !== 'completed' && !loading && isAdmin;
-
-                                            // Verify if it's a structural BYE (Round 1 or later auto-completed with a null player)
-                                            // Since we auto-complete structural byes immediately, checking for status === 'completed', 
-                                            // and possessing exactly one player at the time is a good heuristic.
-                                            // BUT wait, p1 and p2 might just not be ready yet. A true structural bye means one specific slot will NEVER be filled.
-                                            // The safest way is to check the feeder matches to see if the other slot even exists...
-                                            // But for rendering, checking if one player is null and it's already 'completed' works because normal unfinished matches are 'pending'.
                                             const isByeMatch = (!match.player1Id || !match.player2Id) && match.status === 'completed';
+                                            const isCompleted = match.status === 'completed';
 
                                             return (
-                                                <div key={match.id} className={`bracket-match ${!bothReady && !isByeMatch ? 'waiting' : ''}`}>
-                                                    <div
-                                                        className={`bracket-player ${match.winnerId === match.player1Id ? 'winner' : ''}`}
-                                                        onClick={() => canPlay && handleSetWinner(match, match.player1Id)}
-                                                        style={{ cursor: canPlay ? 'pointer' : 'default', opacity: (!match.player1Id && !isByeMatch) ? 0.4 : 1 }}
-                                                    >
-                                                        <span className="bracket-player-name" style={{ color: isByeMatch && !match.player1Id ? 'var(--text-muted)' : 'inherit' }}>
-                                                            {p1?.name || (isByeMatch && !match.player1Id ? 'Avanço Direto (W.O.)' : (match.player1Id ? 'Jogador' : 'Aguardando...'))}
-                                                        </span>
-                                                        <span className="bracket-player-score">
-                                                            {match.winnerId === match.player1Id ? '✓' : (match.player1Id ? (match.score1 ?? '-') : (isByeMatch ? '-' : ''))}
-                                                        </span>
+                                                <div key={match.id} className="bracket-match-new" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: `1px solid ${isCompleted ? 'rgba(52,211,153,0.12)' : 'rgba(148,163,184,0.08)'}`, borderRadius: 16, overflow: 'hidden', padding: 12, position: 'relative', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', opacity: (!bothReady && !isByeMatch) ? 0.6 : 1 }}>
+                                                    {/* Player 1 */}
+                                                    <div onClick={() => canPlay && handleSetWinner(match, match.player1Id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, borderRadius: 10, cursor: canPlay ? 'pointer' : 'default', background: match.winnerId === match.player1Id ? 'rgba(52,211,153,0.1)' : 'transparent', border: `1px solid ${match.winnerId === match.player1Id ? 'rgba(52,211,153,0.3)' : 'transparent'}`, transition: 'all 0.2s', opacity: (!match.player1Id && !isByeMatch) ? 0.4 : 1 }}>
+                                                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${match.winnerId === match.player1Id ? '#34d399' : 'rgba(148,163,184,0.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: match.winnerId === match.player1Id ? '#34d399' : '#64748b', overflow: 'hidden', flexShrink: 0 }}>
+                                                            {p1?.photo ? <img src={p1.photo} alt={p1.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (p1 ? getInitials(p1.name) : '?')}
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontSize: 13, fontWeight: 700, color: match.winnerId === match.player1Id ? '#34d399' : (isByeMatch && !match.player1Id) ? '#64748b' : '#e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                {p1?.name || (isByeMatch && !match.player1Id ? 'Avanço Direto (W.O.)' : (match.player1Id ? 'Jogador' : 'Aguardando...'))}
+                                                                {match.winnerId === match.player1Id && <CheckCircle size={12} color="#34d399" />}
+                                                            </div>
+                                                            {p1?.nickname && <div style={{ fontSize: 11, color: '#475569' }}>{p1.nickname}</div>}
+                                                        </div>
                                                     </div>
-                                                    <div
-                                                        className={`bracket-player ${match.winnerId === match.player2Id ? 'winner' : ''}`}
-                                                        onClick={() => canPlay && handleSetWinner(match, match.player2Id)}
-                                                        style={{ cursor: canPlay ? 'pointer' : 'default', opacity: (!match.player2Id && !isByeMatch) ? 0.4 : 1 }}
-                                                    >
-                                                        <span className="bracket-player-name" style={{ color: isByeMatch && !match.player2Id ? 'var(--text-muted)' : 'inherit' }}>
-                                                            {p2?.name || (isByeMatch && !match.player2Id ? 'Avanço Direto (W.O.)' : (match.player2Id ? 'Jogador' : 'Aguardando...'))}
-                                                        </span>
-                                                        <span className="bracket-player-score">
-                                                            {match.winnerId === match.player2Id ? '✓' : (match.player2Id ? (match.score2 ?? '-') : (isByeMatch ? '-' : ''))}
-                                                        </span>
+
+                                                    <div style={{ height: 1, background: 'rgba(148,163,184,0.05)', margin: '8px 0' }} />
+
+                                                    {/* Player 2 */}
+                                                    <div onClick={() => canPlay && handleSetWinner(match, match.player2Id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, borderRadius: 10, cursor: canPlay ? 'pointer' : 'default', background: match.winnerId === match.player2Id ? 'rgba(52,211,153,0.1)' : 'transparent', border: `1px solid ${match.winnerId === match.player2Id ? 'rgba(52,211,153,0.3)' : 'transparent'}`, transition: 'all 0.2s', opacity: (!match.player2Id && !isByeMatch) ? 0.4 : 1 }}>
+                                                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${match.winnerId === match.player2Id ? '#34d399' : 'rgba(148,163,184,0.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: match.winnerId === match.player2Id ? '#34d399' : '#64748b', overflow: 'hidden', flexShrink: 0 }}>
+                                                            {p2?.photo ? <img src={p2.photo} alt={p2.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (p2 ? getInitials(p2.name) : '?')}
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontSize: 13, fontWeight: 700, color: match.winnerId === match.player2Id ? '#34d399' : (isByeMatch && !match.player2Id) ? '#64748b' : '#e2e8f0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                {p2?.name || (isByeMatch && !match.player2Id ? 'Avanço Direto (W.O.)' : (match.player2Id ? 'Jogador' : 'Vencedor Prev.'))}
+                                                                {match.winnerId === match.player2Id && <CheckCircle size={12} color="#34d399" />}
+                                                            </div>
+                                                            {p2?.nickname && <div style={{ fontSize: 11, color: '#475569' }}>{p2.nickname}</div>}
+                                                        </div>
                                                     </div>
-                                                    {match.status === 'completed' && bothReady && !isByeMatch && isAdmin && (
-                                                        <div style={{ textAlign: 'center', borderTop: '1px solid var(--border-subtle)' }}>
-                                                            <button
-                                                                className="btn btn-sm"
-                                                                style={{ width: '100%', borderRadius: 0, color: 'var(--red-400)', background: 'rgba(239,68,68,0.06)', fontSize: 11, padding: '6px 0' }}
-                                                                onClick={() => !loading && handleUndoResult(match)}
-                                                                disabled={loading}
-                                                            >
-                                                                <Undo2 size={12} /> Desfazer
+
+                                                    {/* Undo Btn */}
+                                                    {isCompleted && bothReady && !isByeMatch && isAdmin && (
+                                                        <div style={{ position: 'absolute', top: '50%', right: 8, transform: 'translateY(-50%)' }}>
+                                                            <button onClick={() => !loading && handleUndoResult(match)} disabled={loading} style={{ background: 'rgba(239,68,68,0.1)', border: 'none', color: '#f87171', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Desfazer">
+                                                                <Undo2 size={14} />
                                                             </button>
                                                         </div>
                                                     )}
@@ -762,73 +739,67 @@ export default function Matches() {
                             })}
                         </div>
                     ) : (
-                        // Grid View for Round-Robin & Swiss
+                        // Grid View for Swiss & Round-Robin
                         Object.entries(rounds).map(([roundNum, roundMatches]) => (
                             <div key={roundNum} style={{ marginBottom: 24 }}>
-                                <h3 style={{
-                                    fontFamily: 'var(--font-display)',
-                                    fontSize: 16,
-                                    fontWeight: 600,
-                                    color: 'var(--green-400)',
-                                    marginBottom: 12,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: 1
-                                }}>
-                                    Rodada {roundNum}
-                                </h3>
-                                <div className="matches-grid">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                    <Zap size={14} color="#60a5fa" />
+                                    <span style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800, color: '#60a5fa', letterSpacing: 3, textTransform: 'uppercase' }}>Rodada {roundNum}</span>
+                                    <div style={{ flex: 1, height: 1, background: 'rgba(96,165,250,0.1)', marginLeft: 4 }} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
                                     {roundMatches.map(match => {
                                         const p1 = playersMap[match.player1Id];
                                         const p2 = match.player2Id ? playersMap[match.player2Id] : null;
                                         const isCompleted = match.status === 'completed';
+                                        const bothReady = match.player1Id && match.player2Id;
+                                        const canClick = !loading && !isCompleted && bothReady && isAdmin;
+                                        const isByeMatch = (!match.player1Id || !match.player2Id) && match.status === 'completed';
 
                                         return (
-                                            <div key={match.id} className={`match-card ${isCompleted ? 'completed' : ''}`}>
-                                                <div className="match-round">
-                                                    {isCompleted ? '✅ Finalizado' : '⏳ Aguardando resultado'}
+                                            <div key={match.id} style={{ background: isCompleted ? 'linear-gradient(135deg, rgba(52,211,153,0.05), rgba(15,20,32,0.98))' : 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: `1px solid ${isCompleted ? 'rgba(52,211,153,0.15)' : 'rgba(148,163,184,0.08)'}`, borderRadius: 16, overflow: 'hidden', position: 'relative' }}>
+                                                {/* Status pill */}
+                                                <div style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: `1px solid ${isCompleted ? 'rgba(52,211,153,0.1)' : 'rgba(148,163,184,0.05)'}` }}>
+                                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: isCompleted ? '#34d399' : '#fbbf24', boxShadow: `0 0 6px ${isCompleted ? '#34d399' : '#fbbf24'}` }} />
+                                                    <span style={{ fontSize: 10, fontWeight: 700, color: isCompleted ? '#34d399' : '#fbbf24', textTransform: 'uppercase', letterSpacing: 0.8 }}>{isCompleted ? 'Finalizado' : 'Aguardando'}</span>
                                                 </div>
-                                                <div className="match-versus">
-                                                    <div
-                                                        className={`match-player ${match.winnerId === match.player1Id ? 'winner' : ''}`}
-                                                        onClick={() => !loading && !isCompleted && p1 && p2 && isAdmin && handleSetWinner(match, match.player1Id)}
-                                                    >
-                                                        <div className="player-avatar-sm" style={{ margin: '0 auto 6px', overflow: 'hidden' }}>
-                                                            {p1?.photo ? <img src={p1.photo} alt={p1.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (p1 ? getInitials(p1.name) : '?')}
+                                                {/* Players */}
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 8, padding: '16px 12px' }}>
+                                                    {/* Player 1 */}
+                                                    <div onClick={() => canClick && handleSetWinner(match, match.player1Id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, cursor: canClick ? 'pointer' : 'default', background: match.winnerId === match.player1Id ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', border: `1px solid ${match.winnerId === match.player1Id ? 'rgba(52,211,153,0.3)' : 'rgba(148,163,184,0.06)'}`, transition: 'all 0.2s', opacity: (!match.player1Id && !isByeMatch) ? 0.4 : 1 }}>
+                                                        <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${match.winnerId === match.player1Id ? '#34d399' : 'rgba(148,163,184,0.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: match.winnerId === match.player1Id ? '#34d399' : '#64748b', overflow: 'hidden' }}>
+                                                            {p1?.photo ? <img src={p1.photo} alt={p1.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (p1 ? getInitials(p1.name) : '?')}
                                                         </div>
-                                                        <div className="match-player-name">{p1?.name || 'TBD'}</div>
-                                                        {p1?.nickname && (
-                                                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p1.nickname}</div>
-                                                        )}
+                                                        <div style={{ textAlign: 'center' }}>
+                                                            <div style={{ fontSize: 12, fontWeight: 700, color: match.winnerId === match.player1Id ? '#34d399' : (isByeMatch && !match.player1Id) ? '#64748b' : '#e2e8f0' }}>{p1?.name || (isByeMatch && !match.player1Id ? 'W.O.' : 'TBD')}</div>
+                                                            {p1?.nickname && <div style={{ fontSize: 10, color: '#475569' }}>{p1.nickname}</div>}
+                                                            {match.winnerId === match.player1Id && <div style={{ fontSize: 10, color: '#34d399', fontWeight: 800, marginTop: 2 }}>✓ VENCEDOR</div>}
+                                                        </div>
                                                     </div>
-                                                    <div className="match-vs">VS</div>
-                                                    <div
-                                                        className={`match-player ${match.winnerId === match.player2Id ? 'winner' : ''}`}
-                                                        onClick={() => !loading && !isCompleted && p1 && p2 && isAdmin && handleSetWinner(match, match.player2Id)}
-                                                    >
-                                                        <div className="player-avatar-sm" style={{ margin: '0 auto 6px', overflow: 'hidden' }}>
-                                                            {p2?.photo ? <img src={p2.photo} alt={p2.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (p2 ? getInitials(p2.name) : '?')}
+                                                    {/* VS */}
+                                                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 900, color: '#334155', letterSpacing: 1 }}>VS</div>
+                                                    {/* Player 2 */}
+                                                    <div onClick={() => canClick && handleSetWinner(match, match.player2Id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 8px', borderRadius: 12, cursor: canClick ? 'pointer' : 'default', background: match.winnerId === match.player2Id ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', border: `1px solid ${match.winnerId === match.player2Id ? 'rgba(52,211,153,0.3)' : 'rgba(148,163,184,0.06)'}`, transition: 'all 0.2s', opacity: (!match.player2Id && !isByeMatch) ? 0.4 : 1 }}>
+                                                        <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${match.winnerId === match.player2Id ? '#34d399' : 'rgba(148,163,184,0.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: match.winnerId === match.player2Id ? '#34d399' : '#64748b', overflow: 'hidden' }}>
+                                                            {p2?.photo ? <img src={p2.photo} alt={p2.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (p2 ? getInitials(p2.name) : '?')}
                                                         </div>
-                                                        <div className="match-player-name">{p2?.name || 'TBD'}</div>
-                                                        {p2?.nickname && (
-                                                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p2.nickname}</div>
-                                                        )}
+                                                        <div style={{ textAlign: 'center' }}>
+                                                            <div style={{ fontSize: 12, fontWeight: 700, color: match.winnerId === match.player2Id ? '#34d399' : (isByeMatch && !match.player2Id) ? '#64748b' : '#e2e8f0' }}>{p2?.name || (isByeMatch && !match.player2Id ? 'W.O.' : 'TBD')}</div>
+                                                            {p2?.nickname && <div style={{ fontSize: 10, color: '#475569' }}>{p2.nickname}</div>}
+                                                            {match.winnerId === match.player2Id && <div style={{ fontSize: 10, color: '#34d399', fontWeight: 800, marginTop: 2 }}>✓ VENCEDOR</div>}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                {!isCompleted && p1 && p2 && isAdmin && (
-                                                    <div style={{ textAlign: 'center', marginTop: 12 }}>
-                                                        <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                                                            Clique no vencedor para registrar resultado
-                                                        </span>
+                                                {/* Hint or Undo */}
+                                                {!isCompleted && canClick && (
+                                                    <div style={{ textAlign: 'center', padding: '0 12px 12px' }}>
+                                                        <span style={{ fontSize: 10, color: '#334155', fontWeight: 500 }}>Clique no vencedor para registrar</span>
                                                     </div>
                                                 )}
-                                                {isCompleted && isAdmin && (
-                                                    <div style={{ textAlign: 'center', marginTop: 12 }}>
-                                                        <button
-                                                            className="btn btn-danger btn-sm"
-                                                            onClick={() => !loading && handleUndoResult(match)}
-                                                            disabled={loading}
-                                                        >
-                                                            <Undo2 size={14} /> Desfazer Resultado
+                                                {isCompleted && bothReady && !isByeMatch && isAdmin && (
+                                                    <div style={{ borderTop: '1px solid rgba(148,163,184,0.05)' }}>
+                                                        <button onClick={() => !loading && handleUndoResult(match)} disabled={loading} style={{ width: '100%', padding: '8px', background: 'none', border: 'none', color: '#f87171', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                                                            <Undo2 size={12} /> Desfazer
                                                         </button>
                                                     </div>
                                                 )}
@@ -838,125 +809,94 @@ export default function Matches() {
                                 </div>
                             </div>
                         ))
-                    )
-                    }
+                    )}
 
-                    {
-                        matches.length === 0 && (
-                            <div className="empty-state">
-                                <div className="empty-state-icon">⚔️</div>
-                                <div className="empty-state-title">Sem confrontos</div>
-                                <div className="empty-state-desc">Crie uma seletiva para gerar os confrontos.</div>
-                            </div>
-                        )
-                    }
+                    {matches.length === 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', gap: 12 }}>
+                            <div style={{ fontSize: 48 }}>⚔️</div>
+                            <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: 16 }}>Sem confrontos ainda</div>
+                            <div style={{ color: '#475569', fontSize: 13 }}>Crie uma seletiva para gerar os confrontos.</div>
+                        </div>
+                    )}
                 </>
-            )}
+            )
+            }
 
             {
                 selectives.length === 0 && !loading && (
-                    <div className="empty-state">
-                        <div className="empty-state-icon">🎱</div>
-                        <div className="empty-state-title">Nenhuma seletiva criada</div>
-                        <div className="empty-state-desc">Vá para "Nova Seletiva" para começar</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '40vh', gap: 12 }}>
+                        <div style={{ fontSize: 52 }}>🎱</div>
+                        <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: 16 }}>Nenhuma seletiva criada</div>
+                        <div style={{ color: '#475569', fontSize: 13 }}>Vá para "Nova Seletiva" para começar</div>
                     </div>
                 )
             }
 
             {/* ── Modal Dupla Confirmação para Apagar ── */}
-            {
-                deleteConfirmStep > 0 && (
-                    <div className="modal-overlay" onClick={() => !loading && setDeleteConfirmStep(0)}>
-                        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
-                            <div className="modal-header">
-                                <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--red-400)' }}>
-                                    <AlertTriangle size={20} /> Apagar Seletiva
-                                </h3>
-                                <button className="modal-close" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
-                                    <XCircle size={20} />
-                                </button>
-                            </div>
-                            <div className="modal-body">
-                                {deleteConfirmStep === 1 && (
-                                    <div>
-                                        <p style={{ fontSize: 14, marginBottom: 16, color: 'var(--text-secondary)' }}>
-                                            Tem certeza que deseja apagar a seletiva <strong style={{ color: 'var(--text-primary)' }}>"{activeSelective?.name}"</strong>?
-                                        </p>
-                                        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, fontSize: 13, color: 'var(--red-400)' }}>
-                                            ⚠️ Esta ação irá remover <strong>{totalMatches} partidas</strong> e reverter todos os resultados do ranking.
-                                        </div>
-                                    </div>
-                                )}
-                                {deleteConfirmStep === 2 && (
-                                    <div>
-                                        <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                                            <AlertTriangle size={48} style={{ color: 'var(--red-400)' }} />
-                                        </div>
-                                        <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--red-400)', textAlign: 'center', marginBottom: 8 }}>
-                                            ATENÇÃO: ESTA AÇÃO É IRREVERSÍVEL!
-                                        </p>
-                                        <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>
-                                            A seletiva "{activeSelective?.name}" e todas as suas {totalMatches} partidas serão apagadas permanentemente.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="modal-footer">
-                                <button className="btn btn-secondary" onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading}>
-                                    Cancelar
-                                </button>
-                                {deleteConfirmStep === 1 && (
-                                    <button className="btn btn-danger" onClick={() => !loading && setDeleteConfirmStep(2)} disabled={loading}>
-                                        Sim, quero apagar
-                                    </button>
-                                )}
-                                {deleteConfirmStep === 2 && (
-                                    <button
-                                        className="btn"
-                                        style={{ background: 'var(--red-500)', color: 'white', fontWeight: 700 }}
-                                        onClick={() => !loading && handleDeleteSelective()}
-                                        disabled={loading}
-                                    >
-                                        {loading ? <Loader className="animate-spin" size={16} /> : '🗑️ CONFIRMAR EXCLUSÃO'}
-                                    </button>
-                                )}
-                            </div>
+            {/* ── Delete Modal ── */}
+            {deleteConfirmStep > 0 && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(8px)' }} onClick={() => !loading && setDeleteConfirmStep(0)}>
+                    <div style={{ background: 'linear-gradient(135deg, #1a2332, #111827)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 20, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#f87171', fontSize: 17, fontWeight: 700, margin: 0 }}>
+                                <AlertTriangle size={20} /> Apagar Seletiva
+                            </h3>
+                            <button onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}><XCircle size={20} /></button>
                         </div>
+                        {deleteConfirmStep === 1 && (
+                            <div>
+                                <p style={{ fontSize: 14, color: '#94a3b8', marginBottom: 14 }}>Tem certeza que deseja apagar a seletiva <strong style={{ color: '#f1f5f9' }}>"{activeSelective?.name}"</strong>?</p>
+                                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: 14, fontSize: 13, color: '#f87171', marginBottom: 20 }}>
+                                    ⚠️ Esta ação irá remover <strong>{totalMatches} partidas</strong> e reverter todos os resultados do ranking.
+                                </div>
+                                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                                    <button onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading} style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid rgba(148,163,184,0.15)', background: 'rgba(255,255,255,0.04)', color: '#94a3b8', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+                                    <button onClick={() => !loading && setDeleteConfirmStep(2)} disabled={loading} style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#f87171', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Sim, quero apagar</button>
+                                </div>
+                            </div>
+                        )}
+                        {deleteConfirmStep === 2 && (
+                            <div>
+                                <div style={{ textAlign: 'center', marginBottom: 16 }}><AlertTriangle size={48} color="#f87171" /></div>
+                                <p style={{ fontSize: 15, fontWeight: 700, color: '#f87171', textAlign: 'center', marginBottom: 8 }}>ATENÇÃO: AÇÃO IRREVERSÍVEL!</p>
+                                <p style={{ fontSize: 13, color: '#64748b', textAlign: 'center', marginBottom: 20 }}>A seletiva "{activeSelective?.name}" e todas as {totalMatches} partidas serão apagadas permanentemente.</p>
+                                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                                    <button onClick={() => !loading && setDeleteConfirmStep(0)} disabled={loading} style={{ padding: '10px 20px', borderRadius: 10, border: '1px solid rgba(148,163,184,0.15)', background: 'rgba(255,255,255,0.04)', color: '#94a3b8', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+                                    <button onClick={() => !loading && handleDeleteSelective()} disabled={loading} style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#ef4444,#dc2626)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                                        {loading ? <Loader size={14} className="animate-spin" /> : '🗑️ CONFIRMAR EXCLUSÃO'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                )
-            }
+                </div>
+            )}
 
-            {/* ── Modal Módulo IA ── */}
+            {/* ── AI Modal ── */}
             {aiModalOpen && (
-                <div className="modal-overlay" onClick={() => setAiModalOpen(false)}>
-                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
-                        <div className="modal-header">
-                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--green-400)' }}>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(8px)' }} onClick={() => setAiModalOpen(false)}>
+                    <div style={{ background: 'linear-gradient(135deg, #1a2332, #111827)', border: '1px solid rgba(52,211,153,0.2)', borderRadius: 20, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#34d399', fontSize: 17, fontWeight: 700, margin: 0 }}>
                                 <BrainCircuit size={20} /> Como funciona a IA?
                             </h3>
-                            <button className="modal-close" onClick={() => setAiModalOpen(false)}>
-                                <XCircle size={20} />
-                            </button>
+                            <button onClick={() => setAiModalOpen(false)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}><XCircle size={20} /></button>
                         </div>
-                        <div className="modal-body" style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6 }}>
-                            <p style={{ marginBottom: 16 }}>
-                                O <strong>Módulo Dinâmico de IA</strong> realiza previsões avançadas sobre as chances de cada jogador terminar a seletiva no <strong>Top 5</strong>.
-                            </p>
-                            <div style={{ background: 'var(--bg-elevated)', padding: 16, borderRadius: 8, marginBottom: 16 }}>
-                                <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
-                                    <li style={{ marginBottom: 12 }}>
-                                        <strong>🎲 Simulação de Monte Carlo</strong><br />
-                                        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>A IA joga o restante do torneio <strong>800 vezes</strong> em frações de segundo, testando todas as combinações possíveis de vitórias e derrotas para as partidas que ainda não aconteceram.</span>
+                        <div style={{ color: '#cbd5e1', fontSize: 14, lineHeight: 1.6 }}>
+                            <p style={{ marginBottom: 16 }}>O <strong>Módulo Dinâmico de IA</strong> realiza previsões avançadas sobre as chances de cada jogador terminar a seletiva no <strong>Top 5</strong>.</p>
+                            <div style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.1)', padding: 16, borderRadius: 12, marginBottom: 16 }}>
+                                <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    <li>
+                                        <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>🎲 Simulação de Monte Carlo</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>A IA joga o restante do torneio <strong>{SIMULATION_COUNT} vezes</strong> em frações de segundo, testando todas as combinações possíveis de vitórias e derrotas para as partidas que ainda não aconteceram.</div>
                                     </li>
                                     <li>
-                                        <strong>📊 Probabilidade Real</strong><br />
-                                        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Se um jogador se classifica em 400 das 800 simulações, sua chance real matemática de classificação é calculada exatamente como 50%.</span>
+                                        <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>📊 Probabilidade Real</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>Se um jogador se classifica em {Math.floor(SIMULATION_COUNT / 2)} das {SIMULATION_COUNT} simulações, sua chance real matemática de classificação é calculada exatamente como 50%.</div>
                                     </li>
                                 </ul>
                             </div>
-                            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                                Apenas estatística pura e direta, atualizada em tempo real de forma dinâmica após cada resultado inserido.
-                            </p>
+                            <p style={{ fontSize: 13, color: '#64748b', textAlign: 'center' }}>Apenas estatística pura e direta, atualizada em tempo real.</p>
                         </div>
                     </div>
                 </div>
