@@ -53,7 +53,9 @@ export default function Sidebar() {
                 <button className="hamburger-btn" onClick={() => setOpen(true)}>
                     <Menu size={24} />
                 </button>
-                <span className="mobile-brand">🎱 A.C.L.S</span>
+                <div className="mobile-header-logo">
+                    <img src="/logo.png" alt="A.C.L.S" className="mobile-logo-img" />
+                </div>
                 <div style={{ width: 40 }} />
             </div>
 
@@ -66,10 +68,12 @@ export default function Sidebar() {
             {/* Sidebar */}
             <aside className={`sidebar ${open ? 'open' : ''}`}>
                 <div className="sidebar-header">
-                    <div className="sidebar-logo">🎱</div>
+                    <div className="sidebar-logo-container">
+                        <img src="/logo.png" alt="A.C.L.S" className="sidebar-logo-img" />
+                    </div>
                     <div className="sidebar-brand">
                         <h1>A.C.L.S</h1>
-                        <span>App</span>
+                        <span>Campo Largo</span>
                     </div>
                     <button
                         className="hamburger-btn"

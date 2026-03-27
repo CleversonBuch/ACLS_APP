@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AdminProvider } from './contexts/AdminContext.jsx';
 import Sidebar from './components/Sidebar.jsx';
@@ -14,6 +14,16 @@ import HallOfFame from './pages/HallOfFame.jsx';
 import Admin from './pages/Admin.jsx';
 
 export default function App() {
+    useEffect(() => {
+        const splash = document.getElementById('splash-screen');
+        if (splash) {
+            const timer = setTimeout(() => {
+                splash.classList.add('fade-out');
+                splash.addEventListener('transitionend', () => splash.remove(), { once: true });
+            }, 1400);
+            return () => clearTimeout(timer);
+        }
+    }, []);
     return (
         <AdminProvider>
             <BrowserRouter>
