@@ -307,6 +307,13 @@ export default function Dashboard() {
                 @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
                 .dash-row-hover:hover { background: rgba(52,211,153,0.04) !important; transform: translateX(2px); }
                 .dash-row-hover { transition: all 0.2s ease; }
+                
+                @media (max-width: 768px) {
+                    .dash-podium-grid { grid-template-columns: 1fr !important; }
+                    .top10-table-header { grid-template-columns: 48px 1fr 64px !important; }
+                    .top10-table-row { grid-template-columns: 48px 1fr 64px !important; }
+                    .hide-mob { display: none !important; }
+                }
             `}</style>
 
             {/* ── Page Header ── */}
@@ -377,7 +384,7 @@ export default function Dashboard() {
             </div>
 
             {/* ── Podium + Chart ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 20, marginBottom: 24 }}>
+            <div className="dash-podium-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 20, marginBottom: 24 }}>
 
                 {/* Podium Card */}
                 <div style={{
@@ -570,7 +577,7 @@ export default function Dashboard() {
                 {top10.length > 0 ? (
                     <div style={{ padding: '0 12px 16px' }}>
                         {/* Table Header */}
-                        <div style={{
+                        <div className="top10-table-header" style={{
                             display: 'grid',
                             gridTemplateColumns: '48px 1fr 100px 52px 52px 64px 64px',
                             padding: '8px 12px',
@@ -582,10 +589,10 @@ export default function Dashboard() {
                             <span>#</span>
                             <span>Jogador</span>
                             <span style={{ textAlign: 'center' }}>{isElo ? 'ELO' : 'Pontos'}</span>
-                            <span style={{ textAlign: 'center' }}>V</span>
-                            <span style={{ textAlign: 'center' }}>D</span>
-                            <span style={{ textAlign: 'center' }}>%</span>
-                            <span style={{ textAlign: 'center' }}>Seq.</span>
+                            <span className="hide-mob" style={{ textAlign: 'center' }}>V</span>
+                            <span className="hide-mob" style={{ textAlign: 'center' }}>D</span>
+                            <span className="hide-mob" style={{ textAlign: 'center' }}>%</span>
+                            <span className="hide-mob" style={{ textAlign: 'center' }}>Seq.</span>
                         </div>
 
                         {top10.map((player, index) => {
@@ -596,7 +603,7 @@ export default function Dashboard() {
                             const winRate = getWinRate(player);
 
                             return (
-                                <div key={player.id} className="dash-row-hover" style={{
+                                <div key={player.id} className="dash-row-hover top10-table-row" style={{
                                     display: 'grid',
                                     gridTemplateColumns: '48px 1fr 100px 52px 52px 64px 64px',
                                     alignItems: 'center',
@@ -635,12 +642,12 @@ export default function Dashboard() {
                                                 : getInitials(player.name)
                                             }
                                         </div>
-                                        <div style={{ minWidth: 0 }}>
+                                        <div style={{ minWidth: 0, overflow: 'hidden' }}>
                                             <div style={{ fontWeight: 700, fontSize: 14, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                 {player.name}
                                             </div>
                                             {player.nickname && (
-                                                <div style={{ fontSize: 11, color: rankColor, fontWeight: 500, opacity: 0.85 }}>
+                                                <div style={{ fontSize: 11, color: rankColor, fontWeight: 500, opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                     {player.nickname}
                                                 </div>
                                             )}
@@ -657,17 +664,17 @@ export default function Dashboard() {
                                     </div>
 
                                     {/* Wins */}
-                                    <div style={{ textAlign: 'center', color: '#34d399', fontWeight: 700, fontSize: 14 }}>
+                                    <div className="hide-mob" style={{ textAlign: 'center', color: '#34d399', fontWeight: 700, fontSize: 14 }}>
                                         {player.wins || 0}
                                     </div>
 
                                     {/* Losses */}
-                                    <div style={{ textAlign: 'center', color: '#f87171', fontWeight: 700, fontSize: 14 }}>
+                                    <div className="hide-mob" style={{ textAlign: 'center', color: '#f87171', fontWeight: 700, fontSize: 14 }}>
                                         {player.losses || 0}
                                     </div>
 
                                     {/* Win Rate */}
-                                    <div style={{ textAlign: 'center' }}>
+                                    <div className="hide-mob" style={{ textAlign: 'center' }}>
                                         <div style={{
                                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                             padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700,
@@ -677,7 +684,7 @@ export default function Dashboard() {
                                     </div>
 
                                     {/* Streak */}
-                                    <div style={{ textAlign: 'center' }}>
+                                    <div className="hide-mob" style={{ textAlign: 'center' }}>
                                         {player.streak > 0 ? (
                                             <div style={{
                                                 display: 'inline-flex', alignItems: 'center', gap: 4,

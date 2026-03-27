@@ -466,10 +466,16 @@ export default function Matches() {
                 .match-row-hover:hover{background:rgba(52,211,153,0.04)!important;transform:translateX(1px);}
                 .match-row-hover{transition:all 0.18s ease!important;}
                 .bracket-match-new:hover{border-color:rgba(52,211,153,0.3)!important;box-shadow:0 4px 20px rgba(0,0,0,0.3)!important;}
+                
+                @media (max-width: 768px) {
+                    .sel-standings-grid { grid-template-columns: 32px 1fr 60px 48px !important; padding: 10px 12px !important; }
+                    .hide-mob { display: none !important; }
+                    .sel-header-wrap { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
+                }
             `}</style>
 
             {/* ── Header ── */}
-            <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div className="sel-header-wrap" style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                         <div style={{ width: 6, height: 32, borderRadius: 3, background: 'linear-gradient(180deg, #60a5fa, #3b82f6)' }} />
@@ -551,8 +557,8 @@ export default function Matches() {
                                 </span>
                             </div>
                             {/* Table header */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 44px 44px 44px 70px 64px', padding: '6px 20px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: 0.8, borderBottom: '1px solid rgba(148,163,184,0.06)' }}>
-                                <span>#</span><span>Jogador</span><span style={{ textAlign: 'center' }}>V</span><span style={{ textAlign: 'center' }}>D</span><span style={{ textAlign: 'center' }}>J</span><span style={{ textAlign: 'center' }}>Aprov.</span><span style={{ textAlign: 'center' }}>Pts</span>
+                            <div className="sel-standings-grid" style={{ display: 'grid', gridTemplateColumns: '44px 1fr 44px 44px 44px 70px 64px', padding: '6px 20px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: 0.8, borderBottom: '1px solid rgba(148,163,184,0.06)' }}>
+                                <span>#</span><span>Jogador</span><span className="hide-mob" style={{ textAlign: 'center' }}>V</span><span className="hide-mob" style={{ textAlign: 'center' }}>D</span><span className="hide-mob" style={{ textAlign: 'center' }}>J</span><span style={{ textAlign: 'center' }}>Aprov.</span><span style={{ textAlign: 'center' }}>Pts</span>
                             </div>
                             {standings.map((s, i) => {
                                 const total = s.wins + s.losses;
@@ -562,22 +568,22 @@ export default function Matches() {
                                 const rowColor = isClassing ? '#34d399' : isBubble ? '#f59e0b' : '#f87171';
                                 const medalMap = ['🥇', '🥈', '🥉'];
                                 return (
-                                    <div key={s.id} className="match-row-hover" style={{ display: 'grid', gridTemplateColumns: '44px 1fr 44px 44px 44px 70px 64px', alignItems: 'center', padding: '10px 20px', borderBottom: `1px solid rgba(148,163,184,0.04)`, borderLeft: `3px solid ${rowColor}22`, background: isClassing ? `rgba(52,211,153,0.03)` : 'transparent' }}>
+                                    <div key={s.id} className="match-row-hover sel-standings-grid" style={{ display: 'grid', gridTemplateColumns: '44px 1fr 44px 44px 44px 70px 64px', alignItems: 'center', padding: '10px 20px', borderBottom: `1px solid rgba(148,163,184,0.04)`, borderLeft: `3px solid ${rowColor}22`, background: isClassing ? `rgba(52,211,153,0.03)` : 'transparent' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, background: `${rowColor}15`, fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13, color: rowColor }}>
                                             {i < 3 ? medalMap[i] : i + 1}
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                                             <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${rowColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: rowColor, flexShrink: 0, overflow: 'hidden' }}>
                                                 {s.photo ? <img src={s.photo} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(s.name)}
                                             </div>
-                                            <div>
-                                                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>{s.name}</div>
-                                                {s.nickname && <div style={{ fontSize: 10, color: rowColor, opacity: 0.8 }}>{s.nickname}</div>}
+                                            <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
+                                                {s.nickname && <div style={{ fontSize: 10, color: rowColor, opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.nickname}</div>}
                                             </div>
                                         </div>
-                                        <div style={{ textAlign: 'center', color: '#34d399', fontWeight: 700, fontSize: 14 }}>{s.wins}</div>
-                                        <div style={{ textAlign: 'center', color: '#f87171', fontWeight: 700, fontSize: 14 }}>{s.losses}</div>
-                                        <div style={{ textAlign: 'center', color: '#64748b', fontSize: 13 }}>{total}</div>
+                                        <div className="hide-mob" style={{ textAlign: 'center', color: '#34d399', fontWeight: 700, fontSize: 14 }}>{s.wins}</div>
+                                        <div className="hide-mob" style={{ textAlign: 'center', color: '#f87171', fontWeight: 700, fontSize: 14 }}>{s.losses}</div>
+                                        <div className="hide-mob" style={{ textAlign: 'center', color: '#64748b', fontSize: 13 }}>{total}</div>
                                         <div style={{ textAlign: 'center' }}>
                                             <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden', marginBottom: 3 }}>
                                                 <div style={{ height: '100%', width: `${rate}%`, background: rowColor, borderRadius: 99 }} />
