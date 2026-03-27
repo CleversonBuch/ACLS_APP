@@ -10,7 +10,8 @@ import {
     Crown,
     Menu,
     X,
-    Shield
+    Shield,
+    Share2
 } from 'lucide-react';
 
 const navItems = [
@@ -103,34 +104,38 @@ export default function Sidebar() {
                     <div style={{ margin: '16px 0', borderTop: '1px solid var(--border-subtle)' }} />
 
                     {installable && (
-                        <button 
-                            className="sidebar-link" 
-                            style={{ width: '100%', border: 'none', background: 'rgba(16, 185, 129, 0.12)', cursor: 'pointer', color: 'var(--green-400)', fontWeight: 600, marginBottom: 4 }}
+                        <button
+                            className="sidebar-link"
+                            style={{ width: '100%', border: 'none', background: 'rgba(52, 211, 153, 0.12)', cursor: 'pointer', color: 'var(--green-400)', fontWeight: 600, marginBottom: 8, transition: 'all 0.2s ease' }}
                             onClick={handleInstallClick}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52, 211, 153, 0.2)'; e.currentTarget.style.transform = 'translateX(4px)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52, 211, 153, 0.12)'; e.currentTarget.style.transform = 'translateX(0)' }}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 12 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <Shield size={20} style={{ marginRight: 2 }} />
                             Instalar App
                         </button>
                     )}
 
-                    <button 
-                        className="sidebar-link" 
-                        style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                    <button
+                        className="sidebar-link"
+                        style={{ width: '100%', border: 'none', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', color: 'var(--text-primary)', fontWeight: 500, transition: 'all 0.2s ease' }}
                         onClick={() => {
                             if (navigator.share) {
                                 navigator.share({
                                     title: 'A.C.L.S App',
                                     text: 'Acompanhe o ranking e as seletivas de sinuca!',
-                                    url: window.location.href
+                                    url: window.location.origin
                                 }).catch(console.error);
                             } else {
-                                navigator.clipboard.writeText(window.location.href);
+                                navigator.clipboard.writeText(window.location.origin);
                                 alert('Link copiado para a área de transferência!');
                             }
                             setOpen(false);
                         }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'translateX(4px)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.transform = 'translateX(0)' }}
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 12 }}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                        <Share2 size={20} style={{ marginRight: 2, color: 'var(--text-secondary)' }} />
                         Compartilhar App
                     </button>
                 </nav>
