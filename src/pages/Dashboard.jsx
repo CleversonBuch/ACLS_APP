@@ -63,7 +63,7 @@ function CountUp({ value }) {
 /* ── Stat Card ─────────────────────────────────── */
 function StatCard({ icon: Icon, value, label, sub, color, gradient, glow }) {
     return (
-        <div style={{
+        <div className="dash-stat-card" style={{
             background: 'linear-gradient(135deg, rgba(26,35,50,0.9) 0%, rgba(17,24,39,0.95) 100%)',
             border: `1px solid ${color}22`,
             borderRadius: 20,
@@ -98,7 +98,7 @@ function StatCard({ icon: Icon, value, label, sub, color, gradient, glow }) {
                 opacity: 0.6,
             }} />
 
-            <div style={{
+            <div className="dash-stat-icon" style={{
                 width: 46, height: 46, borderRadius: 14,
                 background: gradient,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -108,7 +108,7 @@ function StatCard({ icon: Icon, value, label, sub, color, gradient, glow }) {
                 <Icon size={22} color="white" strokeWidth={2} />
             </div>
 
-            <div style={{
+            <div className="dash-stat-value" style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: 34, fontWeight: 800,
                 color: '#f1f5f9', lineHeight: 1,
@@ -118,8 +118,8 @@ function StatCard({ icon: Icon, value, label, sub, color, gradient, glow }) {
                 {typeof value === 'string' && value.includes('%') && '%'}
             </div>
 
-            <div style={{ fontSize: 13, color: '#64748b', marginTop: 6, fontWeight: 500 }}>{label}</div>
-            {sub && <div style={{ fontSize: 11, color: color, marginTop: 4, fontWeight: 600, opacity: 0.8 }}>{sub}</div>}
+            <div className="dash-stat-label" style={{ fontSize: 13, color: '#64748b', marginTop: 6, fontWeight: 500 }}>{label}</div>
+            {sub && <div className="dash-stat-sub" style={{ fontSize: 11, color: color, marginTop: 4, fontWeight: 600, opacity: 0.8 }}>{sub}</div>}
         </div>
     );
 }
@@ -307,12 +307,19 @@ export default function Dashboard() {
                 @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
                 .dash-row-hover:hover { background: rgba(52,211,153,0.04) !important; transform: translateX(2px); }
                 .dash-row-hover { transition: all 0.2s ease; }
-                
                 @media (max-width: 768px) {
                     .dash-podium-grid { grid-template-columns: 1fr !important; }
                     .top10-table-header { grid-template-columns: 48px 1fr 64px !important; }
                     .top10-table-row { grid-template-columns: 48px 1fr 64px !important; }
                     .hide-mob { display: none !important; }
+                    
+                    .dash-stats-responsive { grid-template-columns: 1fr 1fr !important; gap: 10px !important; margin-bottom: 20px !important; }
+                    .dash-stat-card { padding: 14px 16px !important; border-radius: 16px !important; }
+                    .dash-stat-icon { width: 34px !important; height: 34px !important; margin-bottom: 10px !important; border-radius: 10px !important; }
+                    .dash-stat-icon svg { width: 18px !important; height: 18px !important; }
+                    .dash-stat-value { font-size: 24px !important; }
+                    .dash-stat-label { font-size: 11px !important; margin-top: 4px !important; line-height: 1.1 !important; }
+                    .dash-stat-sub { font-size: 9px !important; margin-top: 2px !important; }
                 }
             `}</style>
 
@@ -346,7 +353,7 @@ export default function Dashboard() {
             </div>
 
             {/* ── Stat Cards ── */}
-            <div style={{
+            <div className="dash-stats-responsive" style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                 gap: 16, marginBottom: 28,
