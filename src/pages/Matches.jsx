@@ -896,11 +896,11 @@ export default function Matches() {
                                 <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     <li>
                                         <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>🎲 Simulação de Monte Carlo</div>
-                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>A IA joga o restante do torneio <strong>{SIMULATION_COUNT} vezes</strong> em frações de segundo, testando todas as combinações possíveis de vitórias e derrotas para as partidas que ainda não aconteceram.</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>A IA joga o restante do torneio <strong>800 vezes</strong> em frações de segundo, testando todas as combinações possíveis de vitórias e derrotas para as partidas que ainda não aconteceram.</div>
                                     </li>
                                     <li>
                                         <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>📊 Probabilidade Real</div>
-                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>Se um jogador se classifica em {Math.floor(SIMULATION_COUNT / 2)} das {SIMULATION_COUNT} simulações, sua chance real matemática de classificação é calculada exatamente como 50%.</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>Se um jogador se classifica em 400 das 800 simulações, sua chance real matemática de classificação é calculada exatamente como 50%.</div>
                                     </li>
                                 </ul>
                             </div>
