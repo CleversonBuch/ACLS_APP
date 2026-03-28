@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getRankings, getWinRate, getPlayerScore, rebuildPlayerStats } from '../data/rankingEngine.js';
+import { getRankings, getWinRate, getPlayerScore, recalculateAllRankings } from '../data/rankingEngine.js';
 import { getSettings, updateSettings, resetCurrentRanking, getSelectives, getPlayers } from '../data/db.js';
 import {
     Settings, Crown, Award, Zap, Trophy, Star, Flame,
@@ -62,10 +62,9 @@ export default function Rankings() {
     }
 
     async function handleRecalculate() {
-        if (!confirm('Isto irá recalcular todas as estatísticas de todos os jogadores. Continuar?')) return;
+        if (!confirm('Isto irá recalcular o ELO e todas as estatísticas de todos os jogadores cronologicamente. Continuar?')) return;
         setLoading(true);
-        const players = await getPlayers();
-        for (const p of players) await rebuildPlayerStats(p.id);
+        await recalculateAllRankings();
         await refresh();
     }
 
