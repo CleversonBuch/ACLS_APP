@@ -340,7 +340,7 @@ export function getHeadToHeadResult(playerAId, playerBId, matchList) {
     return 0;
 }
 
-export async function getRankings() {
+export async function getRankings(overrideMode = null) {
     const settings = await getSettings();
     const players = await getPlayers();
     const allMatches = await getAll('matches');
@@ -359,7 +359,8 @@ export async function getRankings() {
         p.sbScore = sb;
     });
 
-    if (settings.rankingMode === 'elo') {
+    const activeMode = overrideMode || settings.rankingMode;
+    if (activeMode === 'elo') {
         return [...players].sort((a, b) => {
             const aElo = a.eloRating || 1000;
             const bElo = b.eloRating || 1000;

@@ -329,6 +329,7 @@ export default function Players() {
     const [showModal, setShowModal] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState(null);
     const [search, setSearch] = useState('');
+    const [sortMode, setSortMode] = useState('points');
     const [showHelp, setShowHelp] = useState(false);
     const [form, setForm] = useState({ name: '', nickname: '', photo: '' });
     const [photoMode, setPhotoMode] = useState('upload');
@@ -356,11 +357,11 @@ export default function Players() {
         reader.readAsDataURL(file);
     }
 
-    useEffect(() => { refresh(); }, []);
+    useEffect(() => { refresh(); }, [sortMode]);
 
     async function refresh() {
         setLoading(true);
-        const ranked = await getRankings();
+        const ranked = await getRankings(sortMode);
         const enriched = await Promise.all(ranked.map(async p => {
             const stageStats = await getPlayerStageStats(p.id);
             const extStats = await getPlayerExternalStats(p.id);
@@ -490,16 +491,35 @@ export default function Players() {
                 )}
             </div>
 
-            {/* Search */}
-            <div style={{ position: 'relative', marginBottom: 24, maxWidth: 360 }}>
-                <Search size={18} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-                <input
-                    className="form-input"
-                    placeholder="Buscar jogador..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    style={{ paddingLeft: 40 }}
-                />
+            {/* Search and Sort */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 24, justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: 260, maxWidth: 360 }}>
+                    <Search size={18} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+                    <input
+                        className="form-input"
+                        placeholder="Buscar jogador..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        style={{ paddingLeft: 40, width: '100%' }}
+                    />
+                </div>
+
+                <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 12, padding: 4 }}>
+                    <button
+                        onClick={() => setSortMode('points')}
+                        disabled={loading}
+                        style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', background: sortMode === 'points' ? 'var(--green-400)' : 'transparent', color: sortMode === 'points' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.2s' }}
+                    >
+                        🏆 Pontos Fixos
+                    </button>
+                    <button
+                        onClick={() => setSortMode('elo')}
+                        disabled={loading}
+                        style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', background: sortMode === 'elo' ? '#3b82f6' : 'transparent', color: sortMode === 'elo' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.2s' }}
+                    >
+                        ⚔️ Ranking ELO
+                    </button>
+                </div>
             </div>
 
             {/* Grid */}
