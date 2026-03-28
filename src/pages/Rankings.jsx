@@ -85,7 +85,7 @@ export default function Rankings() {
     }
 
     function getScore(player) {
-        return getPlayerScore(player, settings);
+        return getPlayerScore(player, { rankingMode: localMode });
     }
 
     const top3 = rankings.slice(0, 3);
@@ -189,28 +189,30 @@ export default function Rankings() {
                     </p>
                 </div>
 
-                {isAdmin && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
-                        {/* Mode toggle */}
-                        <div style={{
-                            display: 'flex', background: 'rgba(255,255,255,0.04)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: 12, padding: 4, gap: 4,
-                        }}>
-                            {[{ label: 'Pontos Fixos', mode: 'points' }, { label: 'ELO Rating', mode: 'elo' }].map(opt => (
-                                <button key={opt.mode} onClick={() => toggleMode(opt.mode)} style={{
-                                    padding: '7px 16px', borderRadius: 8, border: 'none',
-                                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                                    background: (isElo ? opt.mode === 'elo' : opt.mode === 'points')
-                                        ? 'linear-gradient(135deg, #10b981, #059669)'
-                                        : 'transparent',
-                                    color: (isElo ? opt.mode === 'elo' : opt.mode === 'points') ? 'white' : '#64748b',
-                                    transition: 'all 0.2s',
-                                }}>
-                                    {opt.label}
-                                </button>
-                            ))}
-                        </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+                    {/* Mode toggle */}
+                    <div style={{
+                        display: 'flex', background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 12, padding: 4, gap: 4,
+                    }}>
+                        {[{ label: 'Pontos Fixos', mode: 'points' }, { label: 'ELO Rating', mode: 'elo' }].map(opt => (
+                            <button key={opt.mode} onClick={() => toggleMode(opt.mode)} style={{
+                                padding: '7px 16px', borderRadius: 8, border: 'none',
+                                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                                background: (isElo ? opt.mode === 'elo' : opt.mode === 'points')
+                                    ? 'linear-gradient(135deg, #10b981, #059669)'
+                                    : 'transparent',
+                                color: (isElo ? opt.mode === 'elo' : opt.mode === 'points') ? 'white' : '#64748b',
+                                transition: 'all 0.2s',
+                            }}>
+                                {opt.label}
+                            </button>
+                        ))}
+
+                    </div>
+
+                    {isAdmin && (
                         <div style={{ display: 'flex', gap: 8 }}>
                             <button onClick={handleRecalculate} style={{
                                 display: 'flex', alignItems: 'center', gap: 6,
@@ -229,8 +231,8 @@ export default function Rankings() {
                                 <Trash2 size={14} /> Apagar Dados
                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {rankings.length === 0 ? (
