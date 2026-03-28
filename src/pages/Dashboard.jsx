@@ -218,17 +218,23 @@ export default function Dashboard() {
 
     async function refresh() {
         setLoading(true);
-        const [r, st, sel, set] = await Promise.all([
-            getRankings('points'), getGlobalStats(), getSelectives(), getSettings()
+        // Pegar configurações primeiro para saber o modo de ranking
+        const s = await getSettings();
+        if (s) setSettingsState(s);
+
+        const mode = s?.rankingMode || 'points';
+
+        const [r, st, sel] = await Promise.all([
+            getRankings(mode), getGlobalStats(), getSelectives()
         ]);
+
         setRankings(r);
         setStats(st || {});
         setSelectives(sel);
-        if (set) setSettingsState(set);
         setLoading(false);
     }
 
-    const isElo = false;
+    const isElo = settings.rankingMode === 'elo';
     const top3 = rankings.slice(0, 3);
     const top10 = rankings.slice(0, 10);
     const lastSelective = selectives.filter(s => s.status === 'completed').slice(-1)[0];
@@ -265,14 +271,14 @@ export default function Dashboard() {
                     const h = p.pointsHistory.find(h =>
                         (h.date && h.date === evt.date) || (!h.date && h.eventName === evt.name)
                     );
-                    if (h) point[key] = isElo ? (h.eloRating || 1000) : (h.points || 0);
+                    if (h) point[key] = (isElo ? (h.eloRating || 1000) : (h.points || 0));
                 }
             });
             return point;
         });
         const currentPoint = { name: 'Atual' };
         top5Players.forEach(p => {
-            currentPoint[p.nickname || p.name] = getPlayerScore(p, settings);
+            currentPoint[p.nickname || p.name] = getPlayerScore(p, { rankingMode: isElo ? 'elo' : 'points' });
         });
         chartData.push(currentPoint);
     }
@@ -495,7 +501,7 @@ export default function Dashboard() {
                         <span style={{
                             marginLeft: 8, fontSize: 11, color: '#64748b',
                             background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 20,
-                        }}>{isElo ? 'Rating ELO' : 'Pontos'}</span>
+                        }}>{isElo ? 'Rating ELO' : 'Pontos Fixos'}</span>
 
                         {/* Legend dots */}
                         <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -606,7 +612,7 @@ export default function Dashboard() {
                             const isTop3 = index < 3;
                             const colorMap = ['#fbbf24', '#94a3b8', '#cd7f32'];
                             const rankColor = isTop3 ? colorMap[index] : '#475569';
-                            const score = getPlayerScore(player, settings);
+                            const score = getPlayerScore(player, { rankingMode: isElo ? 'elo' : 'points' });
                             const winRate = getWinRate(player);
 
                             return (
