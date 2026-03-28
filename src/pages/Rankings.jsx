@@ -85,7 +85,7 @@ export default function Rankings() {
     }
 
     function getScore(player) {
-        return isElo ? (player.eloRating || 1000) : (player.points || 0);
+        return getPlayerScore(player, settings);
     }
 
     const top3 = rankings.slice(0, 3);
@@ -132,7 +132,7 @@ export default function Rankings() {
         });
         const currentPoint = { name: 'Atual' };
         top5Players.forEach(p => {
-            currentPoint[p.nickname || p.name] = isElo ? (p.eloRating || 1000) : (p.points || 0);
+            currentPoint[p.nickname || p.name] = getScore(p);
         });
         chartData.push(currentPoint);
     }

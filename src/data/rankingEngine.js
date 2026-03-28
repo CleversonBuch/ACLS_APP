@@ -320,6 +320,13 @@ export function getHeadToHeadResult(playerAId, playerBId, matchList) {
     return 0;
 }
 
+export function getEffectiveElo(player) {
+    const games = (player.wins || 0) + (player.losses || 0);
+    const rawElo = player.eloRating || 1000;
+    const factor = Math.min(1, games / 6);
+    return Math.round(rawElo * factor);
+}
+
 export async function getRankings() {
     const settings = await getSettings();
     const players = await getPlayers();
@@ -341,8 +348,13 @@ export async function getRankings() {
 
     if (settings.rankingMode === 'elo') {
         return [...players].sort((a, b) => {
-            const aElo = a.eloRating || 1000;
-            const bElo = b.eloRating || 1000;
+            const aGames = (a.wins || 0) + (a.losses || 0);
+            const bGames = (b.wins || 0) + (b.losses || 0);
+
+            // Fator de Confiança
+            const aElo = getEffectiveElo(a);
+            const bElo = getEffectiveElo(b);
+
             if (bElo !== aElo) return bElo - aElo;
 
             // 1º: Maior número de vitórias
@@ -353,8 +365,6 @@ export async function getRankings() {
             if (h2h !== 0) return -h2h;
 
             // 3º: Maior número de jogos
-            const aGames = (a.wins || 0) + (a.losses || 0);
-            const bGames = (b.wins || 0) + (b.losses || 0);
             if (bGames !== aGames) return bGames - aGames;
 
             // Desempate via Winrate / SB (Normalização final p/ garantir 100% no topo)
@@ -394,7 +404,7 @@ export function getWinRate(player) {
 // ============================================
 export function getPlayerScore(player, settings) {
     if (settings && settings.rankingMode === 'elo') {
-        return player.eloRating || 1000;
+        return getEffectiveElo(player);
     }
     return player.points || 0;
 }
