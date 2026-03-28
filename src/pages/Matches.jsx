@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSelective, deleteSelective, createMatch, updatePlayer } from '../data/db.js';
 import { applyMatchResult, reverseMatchResult, getHeadToHeadResult } from '../data/rankingEngine.js';
 import { generateSwissRound } from '../data/tournamentEngine.js';
+import { computeTop5Chances } from '../data/monteCarloEngine.js';
 import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle, Target, TrendingUp, Sparkles, BrainCircuit, Swords, Activity, Zap } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useAdmin } from '../contexts/AdminContext.jsx';
@@ -374,6 +375,7 @@ export default function Matches() {
         });
     })();
 
+<<<<<<< HEAD
     // ── Compute AI Classification Chances (Monte Carlo) ──
     const top5Chances = (() => {
         if (!activeSelective || matches.length === 0 || standings.length === 0) return {};
@@ -450,6 +452,10 @@ export default function Matches() {
         });
         return chances;
     })();
+=======
+    // ── Compute AI Classification Chances (Monte Carlo Profissional) ──
+    const top5Chances = computeTop5Chances(standings, matches, activeSelective);
+>>>>>>> 54bcc75 (feat: upgrade AI module with professional Monte Carlo engine)
 
     // ── Compute LineChart Data (Points per round strictly for this selective) ──
     const chartLineColors = ['#10b981', '#fbbf24', '#60a5fa', '#f87171', '#a78bfa', '#f472b6', '#34d399', '#818cf8'];
@@ -920,7 +926,7 @@ export default function Matches() {
             {/* ── AI Modal ── */}
             {aiModalOpen && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(8px)' }} onClick={() => setAiModalOpen(false)}>
-                    <div style={{ background: 'linear-gradient(135deg, #1a2332, #111827)', border: '1px solid rgba(52,211,153,0.2)', borderRadius: 20, padding: 28, maxWidth: 440, width: '90%', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ background: 'linear-gradient(135deg, #1a2332, #111827)', border: '1px solid rgba(52,211,153,0.2)', borderRadius: 20, padding: 28, maxWidth: 480, width: '90%', boxShadow: '0 24px 60px rgba(0,0,0,0.6)', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
                             <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#34d399', fontSize: 17, fontWeight: 700, margin: 0 }}>
                                 <BrainCircuit size={20} /> Como funciona a IA?
@@ -928,20 +934,37 @@ export default function Matches() {
                             <button onClick={() => setAiModalOpen(false)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}><XCircle size={20} /></button>
                         </div>
                         <div style={{ color: '#cbd5e1', fontSize: 14, lineHeight: 1.6 }}>
-                            <p style={{ marginBottom: 16 }}>O <strong>Módulo Dinâmico de IA</strong> realiza previsões avançadas sobre as chances de cada jogador terminar a seletiva no <strong>Top 5</strong>.</p>
+                            <p style={{ marginBottom: 16 }}>O <strong>Módulo Dinâmico de IA</strong> usa um motor de <strong>Monte Carlo Profissional</strong> com probabilidades calibradas e dinâmicas para prever as chances de cada jogador terminar no <strong>Top 5</strong>.</p>
                             <div style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.1)', padding: 16, borderRadius: 12, marginBottom: 16 }}>
-                                <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
                                     <li>
+<<<<<<< HEAD
                                         <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>🎲 Simulação de Monte Carlo</div>
                                         <div style={{ fontSize: 13, color: '#94a3b8' }}>A IA joga o restante do torneio <strong>2000 vezes</strong> em frações de segundo, testando todas as combinações prováveis baseada na <strong>Força Relativa</strong> (Taxa de Vitória, Elo, Força do Oponente e Momento) para as partidas que ainda não aconteceram.</div>
                                     </li>
                                     <li>
                                         <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>📊 Cálculo de Probabilidade Matemática</div>
                                         <div style={{ fontSize: 13, color: '#94a3b8' }}>Se um jogador se classifica em 1000 das 2000 simulações, sua chance matemática exata de classificação é calculada como 50%.</div>
+=======
+                                        <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>🎲 2000 Simulações Monte Carlo</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>O torneio é simulado <strong>2000 vezes</strong>. Em cada simulação, os jogos restantes são jogados usando a força real de cada jogador — nunca chance igual para todos.</div>
+                                    </li>
+                                    <li>
+                                        <div style={{ color: '#60a5fa', fontWeight: 600, marginBottom: 4 }}>📐 Força com Laplace Smoothing</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>A força de cada jogador é calculada como <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>(V+1)/(J+2)</code>, evitando distorções para quem jogou poucos jogos.</div>
+                                    </li>
+                                    <li>
+                                        <div style={{ color: '#fbbf24', fontWeight: 600, marginBottom: 4 }}>🎯 Calibração Anti-Superconfiança</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>As probabilidades são suavizadas para evitar valores irreais como 99% logo no início. No começo do campeonato há mais incerteza; no final, as previsões ficam mais precisas.</div>
+                                    </li>
+                                    <li>
+                                        <div style={{ color: '#a78bfa', fontWeight: 600, marginBottom: 4 }}>⚡ Momentum e Qualidade das Vitórias</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>Jogadores em sequência de vitórias ganham bônus de força. Vitórias contra adversários mais fortes também aumentam o peso do jogador nas simulações.</div>
+>>>>>>> 54bcc75 (feat: upgrade AI module with professional Monte Carlo engine)
                                     </li>
                                 </ul>
                             </div>
-                            <p style={{ fontSize: 13, color: '#64748b', textAlign: 'center' }}>Apenas estatística pura e direta, atualizada em tempo real.</p>
+                            <p style={{ fontSize: 13, color: '#64748b', textAlign: 'center' }}>Atualizado automaticamente a cada resultado registrado.</p>
                         </div>
                     </div>
                 </div>
