@@ -218,23 +218,17 @@ export default function Dashboard() {
 
     async function refresh() {
         setLoading(true);
-        // Pegar configurações primeiro para saber o modo de ranking
-        const s = await getSettings();
-        if (s) setSettingsState(s);
-
-        const mode = s?.rankingMode || 'points';
-
-        const [r, st, sel] = await Promise.all([
-            getRankings(mode), getGlobalStats(), getSelectives()
+        const [r, st, sel, set] = await Promise.all([
+            getRankings('points'), getGlobalStats(), getSelectives(), getSettings()
         ]);
-
         setRankings(r);
         setStats(st || {});
         setSelectives(sel);
+        if (set) setSettingsState(set);
         setLoading(false);
     }
 
-    const isElo = settings.rankingMode === 'elo';
+    const isElo = false;
     const top3 = rankings.slice(0, 3);
     const top10 = rankings.slice(0, 10);
     const lastSelective = selectives.filter(s => s.status === 'completed').slice(-1)[0];
@@ -278,7 +272,7 @@ export default function Dashboard() {
         });
         const currentPoint = { name: 'Atual' };
         top5Players.forEach(p => {
-            currentPoint[p.nickname || p.name] = getPlayerScore(p, { rankingMode: isElo ? 'elo' : 'points' });
+            currentPoint[p.nickname || p.name] = getPlayerScore(p, { rankingMode: 'points' });
         });
         chartData.push(currentPoint);
     }
@@ -612,7 +606,7 @@ export default function Dashboard() {
                             const isTop3 = index < 3;
                             const colorMap = ['#fbbf24', '#94a3b8', '#cd7f32'];
                             const rankColor = isTop3 ? colorMap[index] : '#475569';
-                            const score = getPlayerScore(player, { rankingMode: isElo ? 'elo' : 'points' });
+                            const score = getPlayerScore(player, { rankingMode: 'points' });
                             const winRate = getWinRate(player);
 
                             return (
