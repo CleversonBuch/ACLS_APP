@@ -219,7 +219,7 @@ export default function Dashboard() {
     async function refresh() {
         setLoading(true);
         const [r, st, sel, set] = await Promise.all([
-            getRankings(), getGlobalStats(), getSelectives(), getSettings()
+            getRankings('points'), getGlobalStats(), getSelectives(), getSettings()
         ]);
         setRankings(r);
         setStats(st || {});
@@ -228,7 +228,7 @@ export default function Dashboard() {
         setLoading(false);
     }
 
-    const isElo = settings.rankingMode === 'elo';
+    const isElo = false;
     const top3 = rankings.slice(0, 3);
     const top10 = rankings.slice(0, 10);
     const lastSelective = selectives.filter(s => s.status === 'completed').slice(-1)[0];

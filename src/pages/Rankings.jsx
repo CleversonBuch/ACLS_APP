@@ -38,6 +38,7 @@ export default function Rankings() {
     const { isAdmin } = useAdmin();
     const [rankings, setRankingsList] = useState([]);
     const [settings, setSettingsState] = useState({ rankingMode: 'points' });
+    const [localMode, setLocalMode] = useState('points');
     const [selectivesList, setSelectivesList] = useState([]);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [helpModalOpen, setHelpModalOpen] = useState(false);
@@ -47,7 +48,7 @@ export default function Rankings() {
 
     async function refresh() {
         setLoading(true);
-        const [r, s, sel] = await Promise.all([getRankings(), getSettings(), getSelectives()]);
+        const [r, s, sel] = await Promise.all([getRankings(localMode), getSettings(), getSelectives()]);
         setRankingsList(r);
         if (s) setSettingsState(s);
         setSelectivesList(sel);
@@ -70,14 +71,13 @@ export default function Rankings() {
 
     async function toggleMode(mode) {
         setLoading(true);
-        await updateSettings({ rankingMode: mode });
-        setSettingsState(prev => ({ ...prev, rankingMode: mode }));
-        const r = await getRankings();
+        setLocalMode(mode);
+        const r = await getRankings(mode);
         setRankingsList(r);
         setLoading(false);
     }
 
-    const isElo = settings.rankingMode === 'elo';
+    const isElo = localMode === 'elo';
 
     function getInitials(name) {
         if (!name) return '';
