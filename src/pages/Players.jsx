@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPlayers, createPlayer, updatePlayer, deletePlayer, getPlayerStageStats, getPlayerExternalStats } from '../data/db.js';
-import { getWinRate, getRankings } from '../data/rankingEngine.js';
+import { getWinRate, getRankings, getEffectiveElo } from '../data/rankingEngine.js';
 import { UserPlus, X, Edit, Trash2, Search, Upload, Camera, Loader, Flame, Trophy, Target, Zap, Award, HelpCircle } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext.jsx';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
@@ -22,12 +22,12 @@ function PlayerRadar({ player, leagueStats }) {
 
     // Normalise all dims exactly 0-100 compared to the best in the league
     const data = [
-        { subject: 'Vitórias',   A: Math.min(100, (wins / maxW) * 100) },
-        { subject: 'Aproveit.',  A: Math.round(wr) },
-        { subject: 'Sequência',  A: Math.min(100, (streak / maxS) * 100) },
+        { subject: 'Vitórias', A: Math.min(100, (wins / maxW) * 100) },
+        { subject: 'Aproveit.', A: Math.round(wr) },
+        { subject: 'Sequência', A: Math.min(100, (streak / maxS) * 100) },
         { subject: 'Melhor Seq', A: Math.min(100, (bestStreak / maxS) * 100) },
-        { subject: 'Pontos',     A: Math.min(100, (points / maxP) * 100) },
-        { subject: 'Jogos',      A: Math.min(100, (total / maxG) * 100) },
+        { subject: 'Pontos', A: Math.min(100, (points / maxP) * 100) },
+        { subject: 'Jogos', A: Math.min(100, (total / maxG) * 100) },
     ];
 
     return (
@@ -90,14 +90,14 @@ function StatPill({ label, value, color = 'var(--text-primary)', icon }) {
 
 // ─── Player Card ─────────────────────────────────────────────
 function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueStats }) {
-    const wins   = player.wins || 0;
+    const wins = player.wins || 0;
     const losses = player.losses || 0;
-    const total  = wins + losses;
-    const wr     = getWinRate(player);
-    const streak     = player.streak || 0;
+    const total = wins + losses;
+    const wr = getWinRate(player);
+    const streak = player.streak || 0;
     const bestStreak = player.bestStreak || 0;
     const points = player.points || 0;
-    const elo    = player.eloRating || 1000;
+    const elo = getEffectiveElo(player);
 
     function getInitials(name) {
         return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -107,7 +107,7 @@ function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueS
     const rankColors = [
         { border: '#fbbf24', glow: 'rgba(251,191,36,0.25)', fill: 'rgba(251,191,36,0.06)' }, // 1st
         { border: '#94a3b8', glow: 'rgba(148,163,184,0.2)', fill: 'rgba(148,163,184,0.05)' }, // 2nd
-        { border: '#cd7f32', glow: 'rgba(205,127,50,0.2)',  fill: 'rgba(205,127,50,0.05)'  }, // 3rd
+        { border: '#cd7f32', glow: 'rgba(205,127,50,0.2)', fill: 'rgba(205,127,50,0.05)' }, // 3rd
     ];
     const accent = index < 3 ? rankColors[index] : { border: 'rgba(148,163,184,0.15)', glow: 'none', fill: 'transparent' };
 
@@ -208,10 +208,10 @@ function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueS
                 borderBottom: '1px solid rgba(148,163,184,0.08)',
                 marginBottom: 4,
             }}>
-                <StatPill label="Vitórias"  value={wins}    color="var(--green-400)" />
-                <StatPill label="Derrotas"  value={losses}  color="var(--red-400)" />
-                <StatPill label="Jogos"     value={total}   color="var(--text-secondary)" />
-                <StatPill label="Aprov."    value={`${wr}%`} color={wr >= 50 ? 'var(--green-400)' : 'var(--red-400)'} />
+                <StatPill label="Vitórias" value={wins} color="var(--green-400)" />
+                <StatPill label="Derrotas" value={losses} color="var(--red-400)" />
+                <StatPill label="Jogos" value={total} color="var(--text-secondary)" />
+                <StatPill label="Aprov." value={`${wr}%`} color={wr >= 50 ? 'var(--green-400)' : 'var(--red-400)'} />
             </div>
 
             {/* Radar chart */}
@@ -292,17 +292,17 @@ function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueS
             {/* Stage & External stats */}
             {player.stageStats && player.stageStats.stagesPlayed > 0 && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(148,163,184,0.08)', display: 'flex', justifyContent: 'space-around' }}>
-                    <StatPill label="Etapas"  value={player.stageStats.stagesPlayed} color="var(--text-secondary)" />
-                    <StatPill label="🏆 Títulos" value={player.stageStats.titles}   color="var(--gold-400)" />
-                    <StatPill label="🥇🥈🥉"   value={player.stageStats.podiums}   color="var(--bronze)" />
+                    <StatPill label="Etapas" value={player.stageStats.stagesPlayed} color="var(--text-secondary)" />
+                    <StatPill label="🏆 Títulos" value={player.stageStats.titles} color="var(--gold-400)" />
+                    <StatPill label="🥇🥈🥉" value={player.stageStats.podiums} color="var(--bronze)" />
                 </div>
             )}
 
             {player.extStats && player.extStats.total > 0 && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(148,163,184,0.08)', display: 'flex', justifyContent: 'space-around' }}>
-                    <StatPill label="⚔️ Externos"  value={player.extStats.total}    color="var(--text-secondary)" />
-                    <StatPill label="V Ext."        value={player.extStats.wins}     color="var(--green-400)" />
-                    <StatPill label="Aprov. Ext."   value={`${player.extStats.winRate}%`} color={player.extStats.winRate >= 50 ? 'var(--green-400)' : 'var(--red-400)'} />
+                    <StatPill label="⚔️ Externos" value={player.extStats.total} color="var(--text-secondary)" />
+                    <StatPill label="V Ext." value={player.extStats.wins} color="var(--green-400)" />
+                    <StatPill label="Aprov. Ext." value={`${player.extStats.winRate}%`} color={player.extStats.winRate >= 50 ? 'var(--green-400)' : 'var(--red-400)'} />
                 </div>
             )}
 

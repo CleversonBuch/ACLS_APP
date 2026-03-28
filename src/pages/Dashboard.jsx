@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getRankings, getWinRate, getGlobalStats } from '../data/rankingEngine.js';
+import { getRankings, getWinRate, getGlobalStats, getPlayerScore } from '../data/rankingEngine.js';
 import { getSelectives, getSettings } from '../data/db.js';
 import {
     Users, Gamepad2, Flame, Target, Loader, TrendingUp,
@@ -132,7 +132,7 @@ function PodiumPlayer({ player, place, isElo, getInitials }) {
         3: { medal: '🥉', color: '#cd7f32', size: 64, barH: 56, glow: 'rgba(205,127,50,0.3)', zIndex: 1 },
     };
     const cfg = configs[place];
-    const score = isElo ? (player.eloRating || 1000) : (player.points || 0);
+    const score = getPlayerScore(player, { rankingMode: isElo ? 'elo' : 'points' });
 
     return (
         <div style={{
@@ -272,7 +272,7 @@ export default function Dashboard() {
         });
         const currentPoint = { name: 'Atual' };
         top5Players.forEach(p => {
-            currentPoint[p.nickname || p.name] = isElo ? (p.eloRating || 1000) : (p.points || 0);
+            currentPoint[p.nickname || p.name] = getPlayerScore(p, settings);
         });
         chartData.push(currentPoint);
     }
@@ -606,7 +606,7 @@ export default function Dashboard() {
                             const isTop3 = index < 3;
                             const colorMap = ['#fbbf24', '#94a3b8', '#cd7f32'];
                             const rankColor = isTop3 ? colorMap[index] : '#475569';
-                            const score = isElo ? (player.eloRating || 1000) : (player.points || 0);
+                            const score = getPlayerScore(player, settings);
                             const winRate = getWinRate(player);
 
                             return (
