@@ -205,7 +205,23 @@ export async function recalculateAllRankings() {
         const wState = pState[winnerId];
         const lState = pState[loserId];
 
-        if (!wState || !lState) return;
+        if (!wState && !lState) return;
+
+        if (!wState) {
+            // Vencedor foi deletado. Perdedor ainda leva a derrota.
+            lState.losses++;
+            lState.streak = 0;
+            return;
+        }
+
+        if (!lState) {
+            // Caso de W.O. / BYE ou oponente deletado. Vencedor ainda ganha a vitória.
+            wState.points += ptsWin;
+            wState.wins++;
+            wState.streak++;
+            if (wState.streak > wState.bestStreak) wState.bestStreak = wState.streak;
+            return;
+        }
 
         // ELO
         const expectedWin = expectedScore(wState.eloRating, lState.eloRating);
