@@ -111,7 +111,53 @@ export function computeTop5Chances(standings, matches, activeSelective) {
     const totalMatchCount = completedMatches.length + pendingMatches.length;
     const progresso = totalMatchCount > 0 ? completedMatches.length / totalMatchCount : 0;
 
-    // ── SIMULAÇÃO ──
+    // ── Pré-calcular matriz de Confronto Direto (Head-to-Head) ──
+    const h2hWins = {};
+    standings.forEach(s => { h2hWins[s.id] = {}; });
+    completedMatches.forEach(m => {
+        if (m.winnerId) {
+            const loserId = m.winnerId === m.player1Id ? m.player2Id : m.player1Id;
+            if (h2hWins[m.winnerId] && h2hWins[loserId]) {
+                h2hWins[m.winnerId][loserId] = true;
+            }
+        }
+    });
+
+    // ── Pré-calcular dados de cada confronto pendente ──
+    const pendingMatchesData = pendingMatches.map(pm => {
+        let strA = finalStrength[pm.player1Id] ?? 0.5;
+        let strB = finalStrength[pm.player2Id] ?? 0.5;
+
+        // ── Ajuste de Confronto Direto (apenas para este par) ──
+        if (h2hWins[pm.player1Id]?.[pm.player2Id]) {
+            strA *= 1.05;
+            strB *= 0.95;
+        } else if (h2hWins[pm.player2Id]?.[pm.player1Id]) {
+            strB *= 1.05;
+            strA *= 0.95;
+        }
+
+        // ── ETAPA 3: Probabilidade de confronto ──
+        const p_base = strA / (strA + strB);
+
+        // ── ETAPA 4: Calibração anti-superconfiança ──
+        const p_calibrada = p_base * 0.9 + 0.1 * 0.5;
+
+        // ── ETAPA 5: Ajuste por progresso ──
+        const p_final_base = p_calibrada * progresso + 0.5 * (1 - progresso);
+
+        // Volatilidade para ruído
+        const vol = (volatility[pm.player1Id] || 0) * 0.05;
+
+        return {
+            p1: pm.player1Id,
+            p2: pm.player2Id,
+            p_final_base,
+            vol
+        };
+    });
+
+    // ── SIMULAÇÃO MONTE CARLO ──
     const chances = {};
     standings.forEach(s => { chances[s.id] = 0; });
 
@@ -119,25 +165,12 @@ export function computeTop5Chances(standings, matches, activeSelective) {
         const simPoints = {};
         standings.forEach(s => { simPoints[s.id] = s.points; });
 
-        pendingMatches.forEach(pm => {
-            const strA = finalStrength[pm.player1Id] ?? 0.5;
-            const strB = finalStrength[pm.player2Id] ?? 0.5;
-
-            // ── ETAPA 3: Probabilidade de confronto ──
-            const p_base = strA / (strA + strB);
-
-            // ── ETAPA 4: Calibração anti-superconfiança ──
-            const p_calibrada = p_base * 0.9 + 0.1 * 0.5;
-
-            // ── ETAPA 5: Ajuste por progresso ──
-            let p_final = p_calibrada * progresso + 0.5 * (1 - progresso);
-
+        pendingMatchesData.forEach(pm => {
             // ── Volatilidade: ruído aleatório para jogadores inconsistentes ──
-            const vol = (volatility[pm.player1Id] || 0) * 0.05;
-            p_final = Math.max(0.02, Math.min(0.98, p_final + (Math.random() - 0.5) * vol));
+            let p_final = Math.max(0.02, Math.min(0.98, pm.p_final_base + (Math.random() - 0.5) * pm.vol));
 
-            const winner = Math.random() < p_final ? pm.player1Id : pm.player2Id;
-            const loser = winner === pm.player1Id ? pm.player2Id : pm.player1Id;
+            const winner = Math.random() < p_final ? pm.p1 : pm.p2;
+            const loser = winner === pm.p1 ? pm.p2 : pm.p1;
             simPoints[winner] += ptsWin;
             simPoints[loser] += ptsLoss;
         });
