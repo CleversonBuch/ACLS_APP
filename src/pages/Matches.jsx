@@ -390,13 +390,50 @@ export default function Matches() {
             return chances;
         }
 
-        const SIMULATIONS = 800;
+        // --- Modelagem de Força Relativa ---
+        const playerStrength = {};
+        standings.forEach(s => {
+            const globalP = playersMap[s.id];
+            const V = globalP?.wins || 0;
+            const D = globalP?.losses || 0;
+            const J = V + D;
+            const streak = globalP?.streak || 0;
+            const elo = globalP?.eloRating || 1000;
+
+            // Cálculo base com Laplace Smoothing e Volume de Jogos
+            const baseStrength = (V + 1) / (J + 2);
+            const pesoJogos = Math.min(1, J / 6);
+            let finalStrength = baseStrength * (0.7 + 0.3 * pesoJogos);
+
+            // Melhorias Avançadas
+            // 1. Momentum: Bônus por vitórias seguidas (máx +15% na força)
+            const momentumBonus = Math.min(0.15, streak * 0.03);
+            finalStrength += momentumBonus;
+
+            // 2. Força de Adversário: Elo como proxy
+            const eloMultiplier = elo / 1000;
+            finalStrength *= eloMultiplier;
+
+            // 3. Penalização por poucos jogos
+            if (J < 3) {
+                finalStrength *= 0.8; // Reduz em 20%
+            }
+
+            playerStrength[s.id] = Math.max(0.01, finalStrength); // Nunca 0
+        });
+
+        const SIMULATIONS = 2000;
         for (let i = 0; i < SIMULATIONS; i++) {
             const simPoints = {};
             standings.forEach(s => simPoints[s.id] = s.points);
 
             pendingMatches.forEach(pm => {
-                const winner = Math.random() < 0.5 ? pm.player1Id : pm.player2Id;
+                // Probabilidade Relativa
+                const strength1 = playerStrength[pm.player1Id] || 0.5;
+                const strength2 = playerStrength[pm.player2Id] || 0.5;
+                const p1WinProb = strength1 / (strength1 + strength2);
+
+                const winner = Math.random() < p1WinProb ? pm.player1Id : pm.player2Id;
                 const loser = winner === pm.player1Id ? pm.player2Id : pm.player1Id;
                 simPoints[winner] += ptsWin;
                 simPoints[loser] += ptsLoss;
@@ -896,11 +933,11 @@ export default function Matches() {
                                 <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     <li>
                                         <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>🎲 Simulação de Monte Carlo</div>
-                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>A IA joga o restante do torneio <strong>800 vezes</strong> em frações de segundo, testando todas as combinações possíveis de vitórias e derrotas para as partidas que ainda não aconteceram.</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>A IA joga o restante do torneio <strong>2000 vezes</strong> em frações de segundo, testando todas as combinações prováveis baseada na <strong>Força Relativa</strong> (Taxa de Vitória, Elo, Força do Oponente e Momento) para as partidas que ainda não aconteceram.</div>
                                     </li>
                                     <li>
-                                        <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>📊 Probabilidade Real</div>
-                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>Se um jogador se classifica em 400 das 800 simulações, sua chance real matemática de classificação é calculada exatamente como 50%.</div>
+                                        <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>📊 Cálculo de Probabilidade Matemática</div>
+                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>Se um jogador se classifica em 1000 das 2000 simulações, sua chance matemática exata de classificação é calculada como 50%.</div>
                                     </li>
                                 </ul>
                             </div>
