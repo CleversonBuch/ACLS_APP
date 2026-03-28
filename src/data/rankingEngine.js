@@ -37,9 +37,13 @@ export async function applyFixedPoints(winnerId, loserId, config = {}) {
 // ELO Rating Model
 // ============================================
 function getDynamicKFactor(matchesPlayed) {
-    if (matchesPlayed < 5) return 40;
-    if (matchesPlayed <= 10) return 24;
-    return 16;
+    let kBase = 40;
+    if (matchesPlayed >= 5 && matchesPlayed <= 10) kBase = 24;
+    else if (matchesPlayed > 10) kBase = 16;
+
+    // Fator de Confiança: diminui o K-factor para jogadores com poucos jogos (min 1 para o 1º jogo)
+    const factor = Math.min(1, Math.max(1, matchesPlayed) / 6);
+    return kBase * factor;
 }
 
 function expectedScore(ratingA, ratingB) {
@@ -320,13 +324,6 @@ export function getHeadToHeadResult(playerAId, playerBId, matchList) {
     return 0;
 }
 
-export function getEffectiveElo(player) {
-    const games = (player.wins || 0) + (player.losses || 0);
-    const rawElo = player.eloRating || 1000;
-    const factor = Math.min(1, games / 6);
-    return Math.round(rawElo * factor);
-}
-
 export async function getRankings() {
     const settings = await getSettings();
     const players = await getPlayers();
@@ -348,13 +345,8 @@ export async function getRankings() {
 
     if (settings.rankingMode === 'elo') {
         return [...players].sort((a, b) => {
-            const aGames = (a.wins || 0) + (a.losses || 0);
-            const bGames = (b.wins || 0) + (b.losses || 0);
-
-            // Fator de Confiança
-            const aElo = getEffectiveElo(a);
-            const bElo = getEffectiveElo(b);
-
+            const aElo = a.eloRating || 1000;
+            const bElo = b.eloRating || 1000;
             if (bElo !== aElo) return bElo - aElo;
 
             // 1º: Maior número de vitórias
@@ -404,7 +396,7 @@ export function getWinRate(player) {
 // ============================================
 export function getPlayerScore(player, settings) {
     if (settings && settings.rankingMode === 'elo') {
-        return getEffectiveElo(player);
+        return player.eloRating || 1000;
     }
     return player.points || 0;
 }

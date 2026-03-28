@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPlayers, createPlayer, updatePlayer, deletePlayer, getPlayerStageStats, getPlayerExternalStats } from '../data/db.js';
-import { getWinRate, getRankings, getEffectiveElo } from '../data/rankingEngine.js';
+import { getWinRate, getRankings } from '../data/rankingEngine.js';
 import { UserPlus, X, Edit, Trash2, Search, Upload, Camera, Loader, Flame, Trophy, Target, Zap, Award, HelpCircle } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext.jsx';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
@@ -97,7 +97,7 @@ function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueS
     const streak = player.streak || 0;
     const bestStreak = player.bestStreak || 0;
     const points = player.points || 0;
-    const elo = getEffectiveElo(player);
+    const elo = player.eloRating || 1000;
 
     function getInitials(name) {
         return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
