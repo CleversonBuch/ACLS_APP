@@ -22,12 +22,12 @@ function PlayerRadar({ player, leagueStats }) {
 
     // Normalise all dims exactly 0-100 compared to the best in the league
     const data = [
-        { subject: 'Vitórias',   A: Math.min(100, (wins / maxW) * 100) },
-        { subject: 'Aproveit.',  A: Math.round(wr) },
-        { subject: 'Sequência',  A: Math.min(100, (streak / maxS) * 100) },
+        { subject: 'Vitórias', A: Math.min(100, (wins / maxW) * 100) },
+        { subject: 'Aproveit.', A: Math.round(wr) },
+        { subject: 'Sequência', A: Math.min(100, (streak / maxS) * 100) },
         { subject: 'Melhor Seq', A: Math.min(100, (bestStreak / maxS) * 100) },
-        { subject: 'Pontos',     A: Math.min(100, (points / maxP) * 100) },
-        { subject: 'Jogos',      A: Math.min(100, (total / maxG) * 100) },
+        { subject: 'Pontos', A: Math.min(100, (points / maxP) * 100) },
+        { subject: 'Jogos', A: Math.min(100, (total / maxG) * 100) },
     ];
 
     return (
@@ -90,14 +90,14 @@ function StatPill({ label, value, color = 'var(--text-primary)', icon }) {
 
 // ─── Player Card ─────────────────────────────────────────────
 function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueStats }) {
-    const wins   = player.wins || 0;
+    const wins = player.wins || 0;
     const losses = player.losses || 0;
-    const total  = wins + losses;
-    const wr     = getWinRate(player);
-    const streak     = player.streak || 0;
+    const total = wins + losses;
+    const wr = getWinRate(player);
+    const streak = player.streak || 0;
     const bestStreak = player.bestStreak || 0;
     const points = player.points || 0;
-    const elo    = player.eloRating || 1000;
+    const elo = player.eloRating || 1000;
 
     function getInitials(name) {
         return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -107,7 +107,7 @@ function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueS
     const rankColors = [
         { border: '#fbbf24', glow: 'rgba(251,191,36,0.25)', fill: 'rgba(251,191,36,0.06)' }, // 1st
         { border: '#94a3b8', glow: 'rgba(148,163,184,0.2)', fill: 'rgba(148,163,184,0.05)' }, // 2nd
-        { border: '#cd7f32', glow: 'rgba(205,127,50,0.2)',  fill: 'rgba(205,127,50,0.05)'  }, // 3rd
+        { border: '#cd7f32', glow: 'rgba(205,127,50,0.2)', fill: 'rgba(205,127,50,0.05)' }, // 3rd
     ];
     const accent = index < 3 ? rankColors[index] : { border: 'rgba(148,163,184,0.15)', glow: 'none', fill: 'transparent' };
 
@@ -208,10 +208,10 @@ function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueS
                 borderBottom: '1px solid rgba(148,163,184,0.08)',
                 marginBottom: 4,
             }}>
-                <StatPill label="Vitórias"  value={wins}    color="var(--green-400)" />
-                <StatPill label="Derrotas"  value={losses}  color="var(--red-400)" />
-                <StatPill label="Jogos"     value={total}   color="var(--text-secondary)" />
-                <StatPill label="Aprov."    value={`${wr}%`} color={wr >= 50 ? 'var(--green-400)' : 'var(--red-400)'} />
+                <StatPill label="Vitórias" value={wins} color="var(--green-400)" />
+                <StatPill label="Derrotas" value={losses} color="var(--red-400)" />
+                <StatPill label="Jogos" value={total} color="var(--text-secondary)" />
+                <StatPill label="Aprov." value={`${wr}%`} color={wr >= 50 ? 'var(--green-400)' : 'var(--red-400)'} />
             </div>
 
             {/* Radar chart */}
@@ -292,17 +292,17 @@ function PlayerCard({ player, index, isAdmin, onEdit, onDelete, loading, leagueS
             {/* Stage & External stats */}
             {player.stageStats && player.stageStats.stagesPlayed > 0 && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(148,163,184,0.08)', display: 'flex', justifyContent: 'space-around' }}>
-                    <StatPill label="Etapas"  value={player.stageStats.stagesPlayed} color="var(--text-secondary)" />
-                    <StatPill label="🏆 Títulos" value={player.stageStats.titles}   color="var(--gold-400)" />
-                    <StatPill label="🥇🥈🥉"   value={player.stageStats.podiums}   color="var(--bronze)" />
+                    <StatPill label="Etapas" value={player.stageStats.stagesPlayed} color="var(--text-secondary)" />
+                    <StatPill label="🏆 Títulos" value={player.stageStats.titles} color="var(--gold-400)" />
+                    <StatPill label="🥇🥈🥉" value={player.stageStats.podiums} color="var(--bronze)" />
                 </div>
             )}
 
             {player.extStats && player.extStats.total > 0 && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(148,163,184,0.08)', display: 'flex', justifyContent: 'space-around' }}>
-                    <StatPill label="⚔️ Externos"  value={player.extStats.total}    color="var(--text-secondary)" />
-                    <StatPill label="V Ext."        value={player.extStats.wins}     color="var(--green-400)" />
-                    <StatPill label="Aprov. Ext."   value={`${player.extStats.winRate}%`} color={player.extStats.winRate >= 50 ? 'var(--green-400)' : 'var(--red-400)'} />
+                    <StatPill label="⚔️ Externos" value={player.extStats.total} color="var(--text-secondary)" />
+                    <StatPill label="V Ext." value={player.extStats.wins} color="var(--green-400)" />
+                    <StatPill label="Aprov. Ext." value={`${player.extStats.winRate}%`} color={player.extStats.winRate >= 50 ? 'var(--green-400)' : 'var(--red-400)'} />
                 </div>
             )}
 
@@ -329,6 +329,7 @@ export default function Players() {
     const [showModal, setShowModal] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState(null);
     const [search, setSearch] = useState('');
+    const [sortMode, setSortMode] = useState('points');
     const [showHelp, setShowHelp] = useState(false);
     const [form, setForm] = useState({ name: '', nickname: '', photo: '' });
     const [photoMode, setPhotoMode] = useState('upload');
@@ -356,11 +357,11 @@ export default function Players() {
         reader.readAsDataURL(file);
     }
 
-    useEffect(() => { refresh(); }, []);
+    useEffect(() => { refresh(); }, [sortMode]);
 
     async function refresh() {
         setLoading(true);
-        const ranked = await getRankings();
+        const ranked = await getRankings(sortMode);
         const enriched = await Promise.all(ranked.map(async p => {
             const stageStats = await getPlayerStageStats(p.id);
             const extStats = await getPlayerExternalStats(p.id);
@@ -490,16 +491,35 @@ export default function Players() {
                 )}
             </div>
 
-            {/* Search */}
-            <div style={{ position: 'relative', marginBottom: 24, maxWidth: 360 }}>
-                <Search size={18} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-                <input
-                    className="form-input"
-                    placeholder="Buscar jogador..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    style={{ paddingLeft: 40 }}
-                />
+            {/* Search and Sort */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 24, justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: 260, maxWidth: 360 }}>
+                    <Search size={18} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+                    <input
+                        className="form-input"
+                        placeholder="Buscar jogador..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        style={{ paddingLeft: 40, width: '100%' }}
+                    />
+                </div>
+
+                <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 12, padding: 4 }}>
+                    <button
+                        onClick={() => setSortMode('points')}
+                        disabled={loading}
+                        style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', background: sortMode === 'points' ? 'var(--green-400)' : 'transparent', color: sortMode === 'points' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.2s' }}
+                    >
+                        🏆 Pontos Fixos
+                    </button>
+                    <button
+                        onClick={() => setSortMode('elo')}
+                        disabled={loading}
+                        style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', background: sortMode === 'elo' ? '#3b82f6' : 'transparent', color: sortMode === 'elo' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.2s' }}
+                    >
+                        ⚔️ Ranking ELO
+                    </button>
+                </div>
             </div>
 
             {/* Grid */}

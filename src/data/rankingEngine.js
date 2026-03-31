@@ -36,7 +36,15 @@ export async function applyFixedPoints(winnerId, loserId, config = {}) {
 // ============================================
 // ELO Rating Model
 // ============================================
-const K_FACTOR = 32;
+function getDynamicKFactor(matchesPlayed) {
+    let kBase = 40;
+    if (matchesPlayed >= 5 && matchesPlayed <= 10) kBase = 24;
+    else if (matchesPlayed > 10) kBase = 16;
+
+    // Fator de Confiança: diminui o K-factor para jogadores com poucos jogos (min 1 para o 1º jogo)
+    const factor = Math.min(1, Math.max(1, matchesPlayed) / 6);
+    return kBase * factor;
+}
 
 function expectedScore(ratingA, ratingB) {
     return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
@@ -54,8 +62,11 @@ export async function applyEloRating(winnerId, loserId) {
     const expectedWin = expectedScore(winnerRating, loserRating);
     const expectedLose = expectedScore(loserRating, winnerRating);
 
-    const newWinnerRating = Math.round(winnerRating + K_FACTOR * (1 - expectedWin));
-    const newLoserRating = Math.round(loserRating + K_FACTOR * (0 - expectedLose));
+    const wGames = (winner.wins || 0) + (winner.losses || 0);
+    const lGames = (loser.wins || 0) + (loser.losses || 0);
+
+    const newWinnerRating = Math.round(winnerRating + getDynamicKFactor(wGames) * (1 - expectedWin));
+    const newLoserRating = Math.round(loserRating + getDynamicKFactor(lGames) * (0 - expectedLose));
 
     // Update winner (Elo only, stats handled by rebuild)
     await updatePlayer(winnerId, {
@@ -88,8 +99,12 @@ export async function applyMatchResult(winnerId, loserId, config = {}) {
     const loserRating = loser.eloRating || 1000;
     const expectedWin = expectedScore(winnerRating, loserRating);
     const expectedLose = expectedScore(loserRating, winnerRating);
-    const newWinnerRating = Math.round(winnerRating + K_FACTOR * (1 - expectedWin));
-    const newLoserRating = Math.round(loserRating + K_FACTOR * (0 - expectedLose));
+
+    const wGames = (winner.wins || 0) + (winner.losses || 0);
+    const lGames = (loser.wins || 0) + (loser.losses || 0);
+
+    const newWinnerRating = Math.round(winnerRating + getDynamicKFactor(wGames) * (1 - expectedWin));
+    const newLoserRating = Math.round(loserRating + getDynamicKFactor(lGames) * (0 - expectedLose));
 
     // Update winner (both systems points, stats handled by rebuild)
     await updatePlayer(winnerId, {
@@ -143,6 +158,109 @@ export async function reverseMatchResult(winnerId, loserId, config = {}) {
 }
 
 // ============================================
+// Recalculate ALL Rankings Chronologically
+// ============================================
+export async function recalculateAllRankings() {
+    const players = await getPlayers();
+    const allMatches = await getAll('matches');
+
+    // Sort all completed matches chronologically
+    const completedMatches = allMatches
+        .filter(m => m.status === 'completed' && m.winnerId)
+        .sort((a, b) => {
+            const timeA = new Date(a.createdAt || a.scheduledTime || 0).getTime();
+            const timeB = new Date(b.createdAt || b.scheduledTime || 0).getTime();
+            if (Math.abs(timeA - timeB) < 5000) {
+                const roundA = parseInt(a.round) || 0;
+                const roundB = parseInt(b.round) || 0;
+                if (roundA !== roundB) return roundA - roundB;
+                return a.id.localeCompare(b.id);
+            }
+            return timeA - timeB;
+        });
+
+    // Virtual state map
+    const pState = {};
+    players.forEach(p => {
+        pState[p.id] = {
+            points: 0,
+            eloRating: 1000,
+            wins: 0,
+            losses: 0,
+            streak: 0,
+            bestStreak: 0
+        };
+    });
+
+    const settings = await getSettings();
+    const config = settings?.config || {};
+    const ptsWin = config.pointsPerWin ?? 3;
+    const ptsLoss = config.pointsPerLoss ?? 0;
+
+    // Process each match chronologically
+    completedMatches.forEach(m => {
+        const winnerId = m.winnerId;
+        const loserId = winnerId === m.player1Id ? m.player2Id : m.player1Id;
+
+        const wState = pState[winnerId];
+        const lState = pState[loserId];
+
+        if (!wState && !lState) return;
+
+        if (!wState) {
+            // Vencedor foi deletado. Perdedor ainda leva a derrota.
+            lState.losses++;
+            lState.streak = 0;
+            return;
+        }
+
+        if (!lState) {
+            // Caso de W.O. / BYE ou oponente deletado. Vencedor ainda ganha a vitória.
+            wState.points += ptsWin;
+            wState.wins++;
+            wState.streak++;
+            if (wState.streak > wState.bestStreak) wState.bestStreak = wState.streak;
+            return;
+        }
+
+        // ELO
+        const expectedWin = expectedScore(wState.eloRating, lState.eloRating);
+        const expectedLose = expectedScore(lState.eloRating, wState.eloRating);
+
+        const wGames = wState.wins + wState.losses;
+        const lGames = lState.wins + lState.losses;
+
+        wState.eloRating = Math.round(wState.eloRating + getDynamicKFactor(wGames) * (1 - expectedWin));
+        lState.eloRating = Math.max(100, Math.round(lState.eloRating + getDynamicKFactor(lGames) * (0 - expectedLose)));
+
+        // Points
+        wState.points += ptsWin;
+        lState.points += ptsLoss;
+
+        // Stats
+        wState.wins++;
+        wState.streak++;
+        if (wState.streak > wState.bestStreak) wState.bestStreak = wState.streak;
+
+        lState.losses++;
+        lState.streak = 0;
+    });
+
+    // Save back to DB
+    for (const p of players) {
+        const s = pState[p.id];
+        await updatePlayer(p.id, {
+            points: s.points,
+            eloRating: s.eloRating,
+            wins: s.wins,
+            losses: s.losses,
+            streak: s.streak,
+            bestStreak: s.bestStreak
+        });
+    }
+}
+
+// ============================================
 // Robust Player Stats Rebuilder
 // ============================================
 export async function rebuildPlayerStats(playerId) {
@@ -152,7 +270,7 @@ export async function rebuildPlayerStats(playerId) {
     if (!player) return;
 
     const allMatches = await getAll('matches');
-    
+
     // Sort player matches chronologically (by updatedAt, createdAt or ID)
     const playerMatches = allMatches
         .filter(m => m.status === 'completed' && (m.player1Id === playerId || m.player2Id === playerId))
@@ -160,17 +278,17 @@ export async function rebuildPlayerStats(playerId) {
             // Sort matches firmly by creation time so historical edits (updatedAt) don't scramble the timeline
             const timeA = new Date(a.createdAt || a.scheduledTime || 0).getTime();
             const timeB = new Date(b.createdAt || b.scheduledTime || 0).getTime();
-            
+
             // If they were created at almost the exact same time (e.g. round-robin batch creation)
             if (Math.abs(timeA - timeB) < 5000) {
                 // Secondary fallback to tournament round numbers for correct sequence
                 const roundA = parseInt(a.round) || 0;
                 const roundB = parseInt(b.round) || 0;
                 if (roundA !== roundB) return roundA - roundB;
-                
+
                 return a.id.localeCompare(b.id);
             }
-            
+
             return timeA - timeB;
         });
 
@@ -222,7 +340,7 @@ export function getHeadToHeadResult(playerAId, playerBId, matchList) {
     return 0;
 }
 
-export async function getRankings() {
+export async function getRankings(overrideMode = null) {
     const settings = await getSettings();
     const players = await getPlayers();
     const allMatches = await getAll('matches');
@@ -241,8 +359,30 @@ export async function getRankings() {
         p.sbScore = sb;
     });
 
-    if (settings.rankingMode === 'elo') {
-        return [...players].sort((a, b) => (b.eloRating || 1000) - (a.eloRating || 1000));
+    const activeMode = overrideMode || settings.rankingMode;
+    if (activeMode === 'elo') {
+        return [...players].sort((a, b) => {
+            const aElo = a.eloRating || 1000;
+            const bElo = b.eloRating || 1000;
+            if (bElo !== aElo) return bElo - aElo;
+
+            // 1º: Maior número de vitórias
+            if ((b.wins || 0) !== (a.wins || 0)) return (b.wins || 0) - (a.wins || 0);
+
+            // 2º: Confronto direto
+            const h2h = getHeadToHeadResult(a.id, b.id, allMatches);
+            if (h2h !== 0) return -h2h;
+
+            // 3º: Maior número de jogos
+            if (bGames !== aGames) return bGames - aGames;
+
+            // Desempate via Winrate / SB (Normalização final p/ garantir 100% no topo)
+            const aRate = (a.wins || 0) / Math.max(1, aGames);
+            const bRate = (b.wins || 0) / Math.max(1, bGames);
+            if (bRate !== aRate) return bRate - aRate;
+
+            return (b.sbScore || 0) - (a.sbScore || 0);
+        });
     } else {
         return [...players].sort((a, b) => {
             if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
