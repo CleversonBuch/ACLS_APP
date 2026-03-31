@@ -197,20 +197,21 @@ export default function Matches() {
         }
 
         setLoading(true);
+        try {
         const loserId = match.winnerId === match.player1Id ? match.player2Id : match.player1Id;
 
-        // Reverse ranking impact (only for real matches, not BYEs)
-        if (match.player1Id && match.player2Id) {
-            await reverseMatchResult(match.winnerId, loserId, selective?.config);
-        }
-
-        // Reset match to pending
+        // Reset match to pending FIRST so rebuildPlayerStats (inside reverseMatchResult) não conta esta partida
         await updateMatch(match.id, {
             winnerId: null,
             score1: null,
             score2: null,
             status: 'pending'
         });
+
+        // Reverse ranking impact (only for real matches, not BYEs)
+        if (match.player1Id && match.player2Id) {
+            await reverseMatchResult(match.winnerId, loserId, selective?.config);
+        }
 
         // ── Elimination: cascade undo ──
         if (selective?.mode === 'elimination' && match.bracketPosition != null) {
@@ -248,6 +249,10 @@ export default function Matches() {
         }
 
         setRefresh(r => r + 1);
+        } catch (err) {
+            console.error('Erro ao desfazer resultado:', err);
+            setLoading(false);
+        }
     }
 
     async function handleCompleteSelective() {

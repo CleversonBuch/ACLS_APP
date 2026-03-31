@@ -407,29 +407,30 @@ export default function Etapas() {
                                                                 disabled={loading}
                                                                 onClick={async () => {
                                                                     setLoading(true);
-                                                                    const p = playersMap[slot.playerId];
-                                                                    if (p) {
-                                                                        const config = activeSelective?.config || {};
-                                                                        if (isWin) {
-                                                                            await updatePlayer(slot.playerId, {
-                                                                                wins: Math.max(0, (p.wins || 0) - 1),
-                                                                                points: Math.max(0, (p.points || 0) - (config.pointsPerWin ?? 3)),
-                                                                                streak: 0
-                                                                            });
-                                                                        } else {
-                                                                            await updatePlayer(slot.playerId, {
-                                                                                losses: Math.max(0, (p.losses || 0) - 1),
-                                                                                points: Math.max(0, (p.points || 0) - (config.pointsPerLoss ?? 0))
-                                                                            });
+                                                                    try {
+                                                                        const p = playersMap[slot.playerId];
+                                                                        if (p) {
+                                                                            const config = activeSelective?.config || {};
+                                                                            if (isWin) {
+                                                                                // wins/streak são gerenciados por rebuildPlayerStats (partidas), não por confrontos de equipe
+                                                                                await updatePlayer(slot.playerId, {
+                                                                                    points: Math.max(0, (p.points || 0) - (config.pointsPerWin ?? 3))
+                                                                                });
+                                                                            } else {
+                                                                                await updatePlayer(slot.playerId, {
+                                                                                    losses: Math.max(0, (p.losses || 0) - 1),
+                                                                                    points: Math.max(0, (p.points || 0) - (config.pointsPerLoss ?? 0))
+                                                                                });
+                                                                            }
                                                                         }
+                                                                        const newSlots = [...slots];
+                                                                        newSlots[idx] = { ...newSlots[idx], result: null };
+                                                                        const newTeamConfronts = [...workingConfronts];
+                                                                        newTeamConfronts[tcIdx] = { ...tc, slots: newSlots };
+                                                                        await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
+                                                                    } finally {
+                                                                        setRefresh(r => r + 1);
                                                                     }
-                                                                    const newSlots = [...slots];
-                                                                    newSlots[idx] = { ...newSlots[idx], result: null };
-                                                                    const newTeamConfronts = [...workingConfronts];
-                                                                    newTeamConfronts[tcIdx] = { ...tc, slots: newSlots };
-                                                                    await updateSelective(activeSelectiveId, { teamConfronts: newTeamConfronts });
-
-                                                                    setRefresh(r => r + 1);
                                                                 }}
                                                                 style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 4 }}
                                                             >
