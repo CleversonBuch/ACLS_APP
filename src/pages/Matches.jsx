@@ -249,10 +249,10 @@ export default function Matches() {
             }
         }
 
-        setRefresh(r => r + 1);
         } catch (err) {
             console.error('Erro ao desfazer resultado:', err);
-            setLoading(false);
+        } finally {
+            setRefresh(r => r + 1);
         }
     }
 

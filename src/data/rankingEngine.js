@@ -134,12 +134,15 @@ export async function reverseMatchResult(winnerId, loserId, config = {}) {
     const pointsPerWin = config.pointsPerWin ?? 3;
     const pointsPerLoss = config.pointsPerLoss ?? 0;
 
-    // Reverse ELO
+    // Reverse ELO using the same dynamic K formula as applyMatchResult
     const winnerRating = winner.eloRating || 1000;
     const loserRating = loser.eloRating || 1000;
-    const expected = expectedScore(winnerRating, loserRating);
-    const winnerDelta = Math.round(K_FACTOR * (1 - expected));
-    const loserDelta = Math.round(K_FACTOR * expected);
+    const expectedWin = expectedScore(winnerRating, loserRating);
+    const expectedLose = expectedScore(loserRating, winnerRating);
+    const wGames = (winner.wins || 0) + (winner.losses || 0);
+    const lGames = (loser.wins || 0) + (loser.losses || 0);
+    const winnerDelta = Math.round(getDynamicKFactor(wGames) * (1 - expectedWin));
+    const loserDelta = Math.round(getDynamicKFactor(lGames) * expectedLose);
 
     // Reverse winner (points only, stats handled by rebuild)
     await updatePlayer(winnerId, {
