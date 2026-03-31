@@ -11,20 +11,36 @@ import {
     Menu,
     X,
     Shield,
-    Share2
+    Share2,
+    Download
 } from 'lucide-react';
 
-const navItems = [
-    { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/nova-seletiva', icon: PlusCircle, label: 'Nova Seletiva' },
-    { path: '/confrontos', icon: Swords, label: 'Seletivas' },
-    { path: '/nova-etapa', icon: PlusCircle, label: 'Nova Etapa' },
-    { path: '/etapas', icon: Trophy, label: 'Etapas' },
-    { path: '/ranking', icon: Trophy, label: 'Ranking' },
-    { path: '/jogadores', icon: Users, label: 'Jogadores' },
-    { path: '/historico', icon: History, label: 'Histórico' },
-    { path: '/hall-da-fama', icon: Crown, label: 'Hall da Fama' },
-    { path: '/admin', icon: Shield, label: 'Admin' },
+const navGroups = [
+    {
+        label: null,
+        items: [
+            { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+        ]
+    },
+    {
+        label: 'Torneios',
+        items: [
+            { path: '/nova-seletiva', icon: PlusCircle, label: 'Nova Seletiva' },
+            { path: '/confrontos', icon: Swords, label: 'Seletivas' },
+            { path: '/nova-etapa', icon: PlusCircle, label: 'Nova Etapa' },
+            { path: '/etapas', icon: Trophy, label: 'Etapas' },
+        ]
+    },
+    {
+        label: 'Comunidade',
+        items: [
+            { path: '/ranking', icon: Trophy, label: 'Ranking' },
+            { path: '/jogadores', icon: Users, label: 'Jogadores' },
+            { path: '/historico', icon: History, label: 'Histórico' },
+            { path: '/hall-da-fama', icon: Crown, label: 'Hall da Fama' },
+            { path: '/admin', icon: Shield, label: 'Admin' },
+        ]
+    }
 ];
 
 export default function Sidebar() {
@@ -51,13 +67,13 @@ export default function Sidebar() {
         <>
             {/* Mobile Header */}
             <div className="mobile-header">
-                <button className="hamburger-btn" onClick={() => setOpen(true)}>
-                    <Menu size={24} />
+                <button className="hamburger-btn" onClick={() => setOpen(true)} aria-label="Abrir menu">
+                    <Menu size={22} />
                 </button>
                 <div className="mobile-header-logo">
                     <img src="/logo.png" alt="A.C.L.S" className="mobile-logo-img" />
                 </div>
-                <div style={{ width: 40 }} />
+                <div style={{ width: 44 }} />
             </div>
 
             {/* Overlay */}
@@ -68,6 +84,8 @@ export default function Sidebar() {
 
             {/* Sidebar */}
             <aside className={`sidebar ${open ? 'open' : ''}`}>
+
+                {/* Header */}
                 <div className="sidebar-header">
                     <div className="sidebar-logo-container">
                         <img src="/logo.png" alt="A.C.L.S" className="sidebar-logo-img" />
@@ -77,74 +95,74 @@ export default function Sidebar() {
                         <span>Campo Largo</span>
                     </div>
                     <button
-                        className="hamburger-btn"
+                        className="hamburger-btn sidebar-close-btn"
                         onClick={() => setOpen(false)}
-                        style={{ marginLeft: 'auto', display: open ? 'block' : 'none' }}
+                        aria-label="Fechar menu"
                     >
-                        <X size={20} />
+                        <X size={18} />
                     </button>
                 </div>
 
+                {/* Nav */}
                 <nav className="sidebar-nav">
-                    {navItems.map((item) => (
-                        <NavLink
-                            key={item.path}
-                            to={item.path}
-                            end={item.path === '/'}
-                            className={({ isActive }) =>
-                                `sidebar-link ${isActive ? 'active' : ''}`
-                            }
-                            onClick={() => setOpen(false)}
-                        >
-                            <item.icon size={20} />
-                            {item.label}
-                        </NavLink>
+                    {navGroups.map((group, gi) => (
+                        <div key={gi} className="sidebar-group">
+                            {group.label && (
+                                <span className="sidebar-group-label">{group.label}</span>
+                            )}
+                            {group.items.map((item) => (
+                                <NavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    end={item.path === '/'}
+                                    className={({ isActive }) =>
+                                        `sidebar-link ${isActive ? 'active' : ''}`
+                                    }
+                                    onClick={() => setOpen(false)}
+                                >
+                                    <span className="sidebar-link-icon">
+                                        <item.icon size={18} />
+                                    </span>
+                                    <span className="sidebar-link-label">{item.label}</span>
+                                </NavLink>
+                            ))}
+                        </div>
                     ))}
 
-                    <div style={{ margin: '16px 0', borderTop: '1px solid var(--border-subtle)' }} />
-
-                    {installable && (
+                    {/* Utility buttons */}
+                    <div className="sidebar-utilities">
+                        {installable && (
+                            <button className="sidebar-util-btn sidebar-util-green" onClick={handleInstallClick}>
+                                <Download size={16} />
+                                <span>Instalar App</span>
+                            </button>
+                        )}
                         <button
-                            className="sidebar-link"
-                            style={{ width: '100%', border: 'none', background: 'rgba(52, 211, 153, 0.12)', cursor: 'pointer', color: 'var(--green-400)', fontWeight: 600, marginBottom: 8, transition: 'all 0.2s ease' }}
-                            onClick={handleInstallClick}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52, 211, 153, 0.2)'; e.currentTarget.style.transform = 'translateX(4px)' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52, 211, 153, 0.12)'; e.currentTarget.style.transform = 'translateX(0)' }}
+                            className="sidebar-util-btn"
+                            onClick={() => {
+                                if (navigator.share) {
+                                    navigator.share({
+                                        title: 'A.C.L.S App',
+                                        text: 'Acompanhe o ranking e as seletivas de sinuca!',
+                                        url: window.location.origin
+                                    }).catch(console.error);
+                                } else {
+                                    navigator.clipboard.writeText(window.location.origin);
+                                    alert('Link copiado para a área de transferência!');
+                                }
+                                setOpen(false);
+                            }}
                         >
-                            <Shield size={20} style={{ marginRight: 2 }} />
-                            Instalar App
+                            <Share2 size={16} />
+                            <span>Compartilhar App</span>
                         </button>
-                    )}
-
-                    <button
-                        className="sidebar-link"
-                        style={{ width: '100%', border: 'none', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', color: 'var(--text-primary)', fontWeight: 500, transition: 'all 0.2s ease' }}
-                        onClick={() => {
-                            if (navigator.share) {
-                                navigator.share({
-                                    title: 'A.C.L.S App',
-                                    text: 'Acompanhe o ranking e as seletivas de sinuca!',
-                                    url: window.location.origin
-                                }).catch(console.error);
-                            } else {
-                                navigator.clipboard.writeText(window.location.origin);
-                                alert('Link copiado para a área de transferência!');
-                            }
-                            setOpen(false);
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'translateX(4px)' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.transform = 'translateX(0)' }}
-                    >
-                        <Share2 size={20} style={{ marginRight: 2, color: 'var(--text-secondary)' }} />
-                        Compartilhar App
-                    </button>
+                    </div>
                 </nav>
 
+                {/* Footer */}
                 <div className="sidebar-footer">
-                    <p className="sidebar-footer-text">
-                        A.C.L.S v1.0<br />
-                        © 2026 Todos os direitos reservados
-                    </p>
+                    <div className="sidebar-footer-dot" />
+                    <p className="sidebar-footer-text">A.C.L.S v1.0 · © 2026</p>
                 </div>
             </aside>
         </>
