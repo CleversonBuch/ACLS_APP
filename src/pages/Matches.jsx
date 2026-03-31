@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSelective, deleteSelective, createMatch, updatePlayer } from '../data/db.js';
-import { applyMatchResult, reverseMatchResult, getHeadToHeadResult } from '../data/rankingEngine.js';
+import { applyMatchResult, reverseMatchResult, recalculateAllRankings, getHeadToHeadResult } from '../data/rankingEngine.js';
 import { generateSwissRound } from '../data/tournamentEngine.js';
 import { computeTop5Chances } from '../data/monteCarloEngine.js';
 import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle, Target, TrendingUp, Sparkles, BrainCircuit, Swords, Activity, Zap } from 'lucide-react';
@@ -209,9 +209,9 @@ export default function Matches() {
             status: 'pending'
         });
 
-        // Reverse ranking impact (only for real matches, not BYEs)
+        // Recalculate ALL player rankings from scratch (garante consistência total após undo)
         if (match.player1Id && match.player2Id) {
-            await reverseMatchResult(match.winnerId, loserId, selective?.config);
+            await recalculateAllRankings();
         }
 
         // ── Elimination: cascade undo ──
