@@ -3,7 +3,7 @@ import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSe
 import { applyMatchResult, reverseMatchResult, recalculateAllRankings, getHeadToHeadResult } from '../data/rankingEngine.js';
 import { generateSwissRound } from '../data/tournamentEngine.js';
 import { computeTop5Chances } from '../data/monteCarloEngine.js';
-import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle, Target, TrendingUp, Sparkles, BrainCircuit, Swords, Activity, Zap } from 'lucide-react';
+import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle, Target, TrendingUp, Sparkles, BrainCircuit, Swords, Activity, Zap, Search, Flame, ArrowUp, ArrowDown, Minus, RefreshCw, Trophy, Crown, Medal, Star, Play } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useAdmin } from '../contexts/AdminContext.jsx';
 import TiebreakerHelpModal from '../components/TiebreakerHelpModal.jsx';
@@ -19,6 +19,9 @@ export default function Matches() {
     const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
     const [helpModalOpen, setHelpModalOpen] = useState(false);
     const [aiModalOpen, setAiModalOpen] = useState(false);
+    const [searchPlayer, setSearchPlayer] = useState('');
+    const [h2hModalPlayer, setH2hModalPlayer] = useState(null);
+    const [recalculating, setRecalculating] = useState(false);
 
     useEffect(() => {
         async function loadData() {
@@ -304,6 +307,70 @@ export default function Matches() {
         return name ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '?';
     }
 
+    async function handleRecalculate() {
+        if (recalculating) return;
+        setRecalculating(true);
+        try {
+            await recalculateAllRankings();
+        } catch (e) {
+            console.error('Erro ao recalcular:', e);
+        } finally {
+            setRecalculating(false);
+            setRefresh(r => r + 1);
+        }
+    }
+
+    // Compute current consecutive win streak for a player within the current selective
+    function computeWinStreak(playerId, completedMatchesSorted) {
+        let streak = 0;
+        for (let i = completedMatchesSorted.length - 1; i >= 0; i--) {
+            const m = completedMatchesSorted[i];
+            if (m.player1Id !== playerId && m.player2Id !== playerId) continue;
+            if (m.winnerId === playerId) streak++;
+            else break;
+        }
+        return streak;
+    }
+
+    // Compute previous-round standings to detect position changes
+    function computePreviousStandings(playerIds, completedMatches, config) {
+        if (!completedMatches || completedMatches.length === 0) return [];
+        const ptsWin = config?.pointsPerWin ?? 3;
+        const ptsLoss = config?.pointsPerLoss ?? 0;
+        // Get the highest round that has been played
+        const maxRound = Math.max(...completedMatches.map(m => m.round || 1));
+        const prevMatches = completedMatches.filter(m => (m.round || 1) < maxRound);
+        if (prevMatches.length === 0) return [];
+
+        const map = {};
+        playerIds.forEach(pid => { map[pid] = { id: pid, points: 0, wins: 0, losses: 0 }; });
+        prevMatches.forEach(m => {
+            if (map[m.winnerId]) { map[m.winnerId].points += ptsWin; map[m.winnerId].wins += 1; }
+            const loserId = m.winnerId === m.player1Id ? m.player2Id : m.player1Id;
+            if (loserId && map[loserId]) { map[loserId].points += ptsLoss; map[loserId].losses += 1; }
+        });
+        return Object.values(map).sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            if (b.wins !== a.wins) return b.wins - a.wins;
+            return a.losses - b.losses;
+        });
+    }
+
+    // Get head-to-head record between two players (within current selective)
+    function getH2HDetails(playerAId, playerBId, allMatches) {
+        const h2hMatches = allMatches.filter(m =>
+            m.status === 'completed' && m.winnerId &&
+            ((m.player1Id === playerAId && m.player2Id === playerBId) ||
+             (m.player1Id === playerBId && m.player2Id === playerAId))
+        );
+        let aWins = 0, bWins = 0;
+        h2hMatches.forEach(m => {
+            if (m.winnerId === playerAId) aWins++;
+            else if (m.winnerId === playerBId) bWins++;
+        });
+        return { aWins, bWins, total: h2hMatches.length, matches: h2hMatches };
+    }
+
     const activeSelective = selectives.find(s => s.id === activeSelectiveId);
 
     // For elimination, exclude BYE matches from progress
@@ -316,9 +383,21 @@ export default function Matches() {
 
     const canComplete = completedCount === totalMatches && totalMatches > 0;
 
+    // Filter matches by player search
+    const searchTerm = searchPlayer.trim().toLowerCase();
+    const filteredMatches = searchTerm ? matches.filter(m => {
+        const p1 = m.player1Id ? playersMap[m.player1Id] : null;
+        const p2 = m.player2Id ? playersMap[m.player2Id] : null;
+        const n1 = (p1?.name || '').toLowerCase();
+        const n2 = (p2?.name || '').toLowerCase();
+        const k1 = (p1?.nickname || '').toLowerCase();
+        const k2 = (p2?.nickname || '').toLowerCase();
+        return n1.includes(searchTerm) || n2.includes(searchTerm) || k1.includes(searchTerm) || k2.includes(searchTerm);
+    }) : matches;
+
     // Group matches by round
     const rounds = {};
-    matches.forEach(m => {
+    filteredMatches.forEach(m => {
         const round = m.round || 1;
         if (!rounds[round]) rounds[round] = [];
         rounds[round].push(m);
@@ -333,15 +412,25 @@ export default function Matches() {
         const map = {};
         playerIds.forEach(pid => {
             const p = playersMap[pid];
-            map[pid] = { id: pid, name: p?.name || '?', nickname: p?.nickname || '', photo: p?.photo || '', wins: 0, losses: 0, points: 0, sbScore: 0 };
+            map[pid] = { id: pid, name: p?.name || '?', nickname: p?.nickname || '', photo: p?.photo || '', wins: 0, losses: 0, points: 0, sbScore: 0, streak: 0 };
         });
         const completedMatches = matches.filter(m => m.status === 'completed' && m.winnerId);
 
+        // Sort completed matches chronologically by round/createdAt for streak calculation
+        const sortedMatches = [...completedMatches].sort((a, b) => {
+            const rA = a.round || 1;
+            const rB = b.round || 1;
+            if (rA !== rB) return rA - rB;
+            const tA = new Date(a.createdAt || 0).getTime();
+            const tB = new Date(b.createdAt || 0).getTime();
+            return tA - tB;
+        });
+
         // 1. Calculate standard points
+        const config = activeSelective.config || {};
+        const ptsWin = config.pointsPerWin ?? 3;
+        const ptsLoss = config.pointsPerLoss ?? 0;
         completedMatches.forEach(m => {
-            const config = activeSelective.config || {};
-            const ptsWin = config.pointsPerWin ?? 3;
-            const ptsLoss = config.pointsPerLoss ?? 0;
             if (map[m.winnerId]) {
                 map[m.winnerId].wins += 1;
                 map[m.winnerId].points += ptsWin;
@@ -354,7 +443,6 @@ export default function Matches() {
         });
 
         // 2. Calculate Sonneborn-Berger (SB) Score for tiebreakers
-        // SB Score = sum of points of all defeated opponents
         Object.values(map).forEach(player => {
             const wins = completedMatches.filter(m => m.winnerId === player.id);
             wins.forEach(w => {
@@ -363,21 +451,30 @@ export default function Matches() {
                     player.sbScore += map[loserId].points;
                 }
             });
+            // Compute current win streak
+            player.streak = computeWinStreak(player.id, sortedMatches);
         });
 
-        return Object.values(map).sort((a, b) => {
-            // 1st: points
+        const sorted = Object.values(map).sort((a, b) => {
             if (b.points !== a.points) return b.points - a.points;
-            // 2nd: confronto direto (head-to-head within this selective)
             const h2h = getHeadToHeadResult(a.id, b.id, completedMatches);
             if (h2h !== 0) return -h2h;
-            // 3rd: Sonneborn-Berger score (Qualidade de vitórias)
             if (b.sbScore !== a.sbScore) return b.sbScore - a.sbScore;
-            // 4th: more wins
             if (b.wins !== a.wins) return b.wins - a.wins;
-            // 5th: fewer losses
             return a.losses - b.losses;
         });
+
+        // Compute previous-round positions for delta arrows
+        const prev = computePreviousStandings(playerIds, completedMatches, config);
+        const prevPosMap = {};
+        prev.forEach((p, i) => { prevPosMap[p.id] = i; });
+        sorted.forEach((s, i) => {
+            const prevPos = prevPosMap[s.id];
+            s.posChange = (prevPos !== undefined) ? (prevPos - i) : 0;
+            s.hadPrevPos = prevPos !== undefined;
+        });
+
+        return sorted;
     })();
 
     // ── Compute AI Classification Chances (Monte Carlo Profissional) ──
@@ -431,10 +528,12 @@ export default function Matches() {
             <style>{`
                 @keyframes fadeInUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
                 @keyframes spin{to{transform:rotate(360deg)}}
+                @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.2)}}
                 .sel-tab:hover{background:rgba(52,211,153,0.08)!important;color:#e2e8f0!important;}
                 .match-row-hover:hover{background:rgba(52,211,153,0.04)!important;transform:translateX(1px);}
                 .match-row-hover{transition:all 0.18s ease!important;}
                 .bracket-match-new:hover{border-color:rgba(52,211,153,0.3)!important;box-shadow:0 4px 20px rgba(0,0,0,0.3)!important;}
+                .bracket-match-playable:hover{border-color:rgba(96,165,250,0.5)!important;box-shadow:0 6px 24px rgba(96,165,250,0.18)!important;}
                 
                 @media (max-width: 768px) {
                     .sel-standings-grid { grid-template-columns: 24px 1fr 28px 28px 28px 36px !important; padding: 10px 8px !important; gap: 4px !important; }
@@ -457,6 +556,11 @@ export default function Matches() {
                     <p style={{ color: '#475569', fontSize: 14, marginLeft: 16 }}>Confrontos e resultados das partidas</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {activeSelective && isAdmin && (
+                        <button onClick={handleRecalculate} disabled={recalculating || loading} title="Reprocessa pontos, ELO e estatísticas de todos os jogadores a partir das partidas concluídas" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(96,165,250,0.25)', background: 'rgba(96,165,250,0.08)', color: '#60a5fa', fontSize: 12, fontWeight: 600, cursor: recalculating ? 'wait' : 'pointer', opacity: recalculating ? 0.7 : 1 }}>
+                            <RefreshCw size={14} style={{ animation: recalculating ? 'spin 0.8s linear infinite' : 'none' }} /> {recalculating ? 'Recalculando…' : 'Recalcular'}
+                        </button>
+                    )}
                     {activeSelective && isAdmin && (
                         <button onClick={() => setDeleteConfirmStep(1)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)', color: '#f87171', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                             <Trash2 size={14} /> Apagar Seletiva
@@ -520,7 +624,8 @@ export default function Matches() {
                             <div style={{ padding: '16px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <span style={{ fontSize: 17 }}>📊</span>
-                                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>Resultado da Seletiva</span>
+                                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>Classificação da Seletiva</span>
+                                    <span style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa', background: 'rgba(96,165,250,0.1)', padding: '2px 6px', borderRadius: 5, letterSpacing: 0.5, textTransform: 'uppercase' }}>apenas este torneio</span>
                                     <button onClick={() => setHelpModalOpen(true)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 4 }}><HelpCircle size={14} /></button>
                                 </div>
                                 <span style={{ fontSize: 11, color: '#475569', background: 'rgba(255,255,255,0.04)', padding: '3px 10px', borderRadius: 20 }}>
@@ -539,16 +644,29 @@ export default function Matches() {
                                 const rowColor = isClassing ? '#34d399' : isBubble ? '#f59e0b' : '#f87171';
                                 const medalMap = ['🥇', '🥈', '🥉'];
                                 return (
-                                    <div key={s.id} className="match-row-hover sel-standings-grid" style={{ display: 'grid', gridTemplateColumns: '44px 1fr 44px 44px 44px 70px 64px', alignItems: 'center', padding: '10px 20px', borderBottom: `1px solid rgba(148,163,184,0.04)`, borderLeft: `3px solid ${rowColor}22`, background: isClassing ? `rgba(52,211,153,0.03)` : 'transparent', gap: 8 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, background: `${rowColor}15`, fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13, color: rowColor }}>
+                                    <div key={s.id} onClick={() => setH2hModalPlayer(s)} className="match-row-hover sel-standings-grid" style={{ display: 'grid', gridTemplateColumns: '44px 1fr 44px 44px 44px 70px 64px', alignItems: 'center', padding: '10px 20px', borderBottom: `1px solid rgba(148,163,184,0.04)`, borderLeft: `3px solid ${rowColor}22`, background: isClassing ? `rgba(52,211,153,0.03)` : 'transparent', gap: 8, cursor: 'pointer' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, background: `${rowColor}15`, fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13, color: rowColor, position: 'relative' }}>
                                             {i < 3 ? medalMap[i] : i + 1}
+                                            {s.hadPrevPos && s.posChange !== 0 && (
+                                                <span style={{ position: 'absolute', top: -4, right: -6, width: 14, height: 14, borderRadius: '50%', background: s.posChange > 0 ? '#10b981' : '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 6px ${s.posChange > 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.6)'}` }} title={s.posChange > 0 ? `Subiu ${s.posChange}` : `Caiu ${Math.abs(s.posChange)}`}>
+                                                    {s.posChange > 0 ? <ArrowUp size={9} color="#fff" strokeWidth={3} /> : <ArrowDown size={9} color="#fff" strokeWidth={3} />}
+                                                </span>
+                                            )}
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                                             <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${rowColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: rowColor, flexShrink: 0, overflow: 'hidden' }}>
                                                 {s.photo ? <img src={s.photo} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(s.name)}
                                             </div>
-                                            <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                                                <div className="mob-text-sm" style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
+                                            <div style={{ minWidth: 0, overflow: 'hidden', flex: 1 }}>
+                                                <div className="mob-text-sm" style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 5 }}>
+                                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</span>
+                                                    {s.streak >= 2 && (
+                                                        <span title={`${s.streak} vitórias seguidas`} style={{ display: 'inline-flex', alignItems: 'center', gap: 1, padding: '1px 5px', borderRadius: 6, background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.25)', flexShrink: 0 }}>
+                                                            <Flame size={10} color="#fb923c" />
+                                                            <span style={{ fontSize: 9, color: '#fb923c', fontWeight: 800 }}>{s.streak}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {s.nickname && <div className="hide-mob" style={{ fontSize: 10, color: rowColor, opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.nickname}</div>}
                                             </div>
                                         </div>
@@ -641,6 +759,132 @@ export default function Matches() {
                         </div>
                     )}
 
+                    {/* ── Final Summary (when selective is completed) ── */}
+                    {activeSelective?.status === 'completed' && standings.length > 0 && (
+                        (() => {
+                            const champion = standings[0];
+                            const runnerUp = standings[1];
+                            const third = standings[2];
+                            const mvp = [...standings].sort((a, b) => (b.wins || 0) - (a.wins || 0))[0];
+                            const longestStreak = [...standings].sort((a, b) => (b.streak || 0) - (a.streak || 0))[0];
+                            return (
+                                <div style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.06), rgba(15,20,32,0.98))', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 20, overflow: 'hidden', marginBottom: 20, position: 'relative' }}>
+                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #fbbf24, transparent)' }} />
+                                    <div style={{ padding: '18px 22px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Trophy size={18} color="#fbbf24" />
+                                        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16, color: '#fbbf24', letterSpacing: 0.3 }}>Resumo Final</span>
+                                        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.12)', padding: '2px 10px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: 0.8 }}>Encerrada</span>
+                                    </div>
+                                    <div style={{ padding: '12px 20px 22px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                                        {champion && (
+                                            <div style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.12), rgba(251,191,36,0.03))', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 14, padding: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <Crown size={28} color="#fbbf24" />
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ fontSize: 9, color: '#fbbf24', fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>Campeão</div>
+                                                    <div style={{ fontSize: 14, color: '#f1f5f9', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{champion.name}</div>
+                                                    <div style={{ fontSize: 11, color: '#fbbf24' }}>{champion.points} pts</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {runnerUp && (
+                                            <div style={{ background: 'rgba(148,163,184,0.05)', border: '1px solid rgba(148,163,184,0.15)', borderRadius: 14, padding: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <Medal size={26} color="#cbd5e1" />
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>Vice</div>
+                                                    <div style={{ fontSize: 14, color: '#f1f5f9', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{runnerUp.name}</div>
+                                                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{runnerUp.points} pts</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {third && (
+                                            <div style={{ background: 'rgba(180,83,9,0.06)', border: '1px solid rgba(180,83,9,0.2)', borderRadius: 14, padding: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <Medal size={26} color="#d97706" />
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ fontSize: 9, color: '#d97706', fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>3º Lugar</div>
+                                                    <div style={{ fontSize: 14, color: '#f1f5f9', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{third.name}</div>
+                                                    <div style={{ fontSize: 11, color: '#d97706' }}>{third.points} pts</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {mvp && mvp.wins > 0 && (
+                                            <div style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)', borderRadius: 14, padding: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <Star size={26} color="#34d399" />
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ fontSize: 9, color: '#34d399', fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>Mais Vitórias</div>
+                                                    <div style={{ fontSize: 14, color: '#f1f5f9', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mvp.name}</div>
+                                                    <div style={{ fontSize: 11, color: '#34d399' }}>{mvp.wins} V</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {longestStreak && longestStreak.streak >= 2 && (
+                                            <div style={{ background: 'rgba(251,146,60,0.06)', border: '1px solid rgba(251,146,60,0.2)', borderRadius: 14, padding: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <Flame size={26} color="#fb923c" />
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ fontSize: 9, color: '#fb923c', fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase' }}>Maior Sequência</div>
+                                                    <div style={{ fontSize: 14, color: '#f1f5f9', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{longestStreak.name}</div>
+                                                    <div style={{ fontSize: 11, color: '#fb923c' }}>{longestStreak.streak} seguidas</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()
+                    )}
+
+                    {/* ── Next Match Highlight (admin only, active selective) ── */}
+                    {activeSelective?.status === 'active' && isAdmin && (() => {
+                        const nextMatch = matches.find(m => m.status !== 'completed' && m.player1Id && m.player2Id);
+                        if (!nextMatch) return null;
+                        const np1 = playersMap[nextMatch.player1Id];
+                        const np2 = playersMap[nextMatch.player2Id];
+                        return (
+                            <div style={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.08), rgba(15,20,32,0.98))', border: '1px solid rgba(96,165,250,0.25)', borderLeft: '3px solid #60a5fa', borderRadius: 18, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                    <Play size={16} color="#60a5fa" fill="#60a5fa" />
+                                    <div>
+                                        <div style={{ fontSize: 9, fontWeight: 800, color: '#60a5fa', letterSpacing: 1.2, textTransform: 'uppercase' }}>Próxima Partida</div>
+                                        <div style={{ fontSize: 11, color: '#64748b' }}>Rodada {nextMatch.round || 1}</div>
+                                    </div>
+                                </div>
+                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, minWidth: 200 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                        <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(96,165,250,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                                            {np1?.photo ? <img src={np1.photo} alt={np1.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, fontWeight: 800, color: '#60a5fa' }}>{getInitials(np1?.name || '?')}</span>}
+                                        </div>
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{np1?.name || '?'}</span>
+                                    </div>
+                                    <span style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: 1 }}>VS</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{np2?.name || '?'}</span>
+                                        <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(96,165,250,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                                            {np2?.photo ? <img src={np2.photo} alt={np2.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, fontWeight: 800, color: '#60a5fa' }}>{getInitials(np2?.name || '?')}</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {/* ── Match search filter ── */}
+                    {matches.length > 6 && (
+                        <div style={{ marginBottom: 16, position: 'relative', maxWidth: 360 }}>
+                            <Search size={14} color="#475569" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                            <input
+                                type="text"
+                                value={searchPlayer}
+                                onChange={e => setSearchPlayer(e.target.value)}
+                                placeholder="Filtrar partidas por jogador…"
+                                style={{ width: '100%', padding: '10px 12px 10px 34px', borderRadius: 10, border: '1px solid rgba(148,163,184,0.12)', background: 'rgba(15,20,32,0.6)', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
+                            />
+                            {searchPlayer && (
+                                <button onClick={() => setSearchPlayer('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'rgba(148,163,184,0.1)', border: 'none', borderRadius: 6, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}>
+                                    <XCircle size={12} />
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {/* Matches */}
                     {isElimination ? (
                         // Bracket View for Elimination
@@ -668,8 +912,15 @@ export default function Matches() {
                                             const isByeMatch = (!match.player1Id || !match.player2Id) && match.status === 'completed';
                                             const isCompleted = match.status === 'completed';
 
+                                            const isPlayable = bothReady && !isCompleted && !isByeMatch;
                                             return (
-                                                <div key={match.id} className="bracket-match-new" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: `1px solid ${isCompleted ? 'rgba(52,211,153,0.12)' : 'rgba(148,163,184,0.08)'}`, borderRadius: 16, overflow: 'hidden', padding: 12, position: 'relative', transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', opacity: (!bothReady && !isByeMatch) ? 0.6 : 1 }}>
+                                                <div key={match.id} className={`bracket-match-new ${isPlayable ? 'bracket-match-playable' : ''}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: isCompleted ? 'linear-gradient(135deg, rgba(52,211,153,0.06), rgba(15,20,32,0.98))' : isPlayable ? 'linear-gradient(135deg, rgba(96,165,250,0.06), rgba(15,20,32,0.98))' : 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: `1px solid ${isCompleted ? 'rgba(52,211,153,0.25)' : isPlayable ? 'rgba(96,165,250,0.25)' : 'rgba(148,163,184,0.08)'}`, borderRadius: 16, overflow: 'hidden', padding: 12, position: 'relative', transition: 'all 0.2s', boxShadow: isCompleted ? '0 4px 16px rgba(52,211,153,0.08)' : isPlayable ? '0 4px 16px rgba(96,165,250,0.1)' : '0 4px 12px rgba(0,0,0,0.15)', opacity: (!bothReady && !isByeMatch) ? 0.55 : 1 }}>
+                                                    {isPlayable && (
+                                                        <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 99, background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.3)' }}>
+                                                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#60a5fa', boxShadow: '0 0 6px #60a5fa', animation: 'pulse 1.6s ease-in-out infinite' }} />
+                                                            <span style={{ fontSize: 9, fontWeight: 800, color: '#60a5fa', letterSpacing: 0.5, textTransform: 'uppercase' }}>Pronto</span>
+                                                        </div>
+                                                    )}
                                                     {/* Player 1 */}
                                                     <div onClick={() => canPlay && handleSetWinner(match, match.player1Id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, borderRadius: 10, cursor: canPlay ? 'pointer' : 'default', background: match.winnerId === match.player1Id ? 'rgba(52,211,153,0.1)' : 'transparent', border: `1px solid ${match.winnerId === match.player1Id ? 'rgba(52,211,153,0.3)' : 'transparent'}`, transition: 'all 0.2s', opacity: (!match.player1Id && !isByeMatch) ? 0.4 : 1 }}>
                                                         <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `2px solid ${match.winnerId === match.player1Id ? '#34d399' : 'rgba(148,163,184,0.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: match.winnerId === match.player1Id ? '#34d399' : '#64748b', overflow: 'hidden', flexShrink: 0 }}>
@@ -733,12 +984,13 @@ export default function Matches() {
                                         const canClick = !loading && !isCompleted && bothReady && isAdmin;
                                         const isByeMatch = (!match.player1Id || !match.player2Id) && match.status === 'completed';
 
+                                        const isPlayableSwiss = bothReady && !isCompleted && !isByeMatch;
                                         return (
-                                            <div key={match.id} style={{ background: isCompleted ? 'linear-gradient(135deg, rgba(52,211,153,0.05), rgba(15,20,32,0.98))' : 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: `1px solid ${isCompleted ? 'rgba(52,211,153,0.15)' : 'rgba(148,163,184,0.08)'}`, borderRadius: 16, overflow: 'hidden', position: 'relative' }}>
+                                            <div key={match.id} style={{ background: isCompleted ? 'linear-gradient(135deg, rgba(52,211,153,0.06), rgba(15,20,32,0.98))' : isPlayableSwiss ? 'linear-gradient(135deg, rgba(96,165,250,0.05), rgba(15,20,32,0.98))' : 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: `1px solid ${isCompleted ? 'rgba(52,211,153,0.22)' : isPlayableSwiss ? 'rgba(96,165,250,0.2)' : 'rgba(148,163,184,0.08)'}`, borderRadius: 16, overflow: 'hidden', position: 'relative', boxShadow: isCompleted ? '0 4px 14px rgba(52,211,153,0.06)' : isPlayableSwiss ? '0 4px 14px rgba(96,165,250,0.08)' : 'none', transition: 'all 0.2s' }}>
                                                 {/* Status pill */}
-                                                <div style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: `1px solid ${isCompleted ? 'rgba(52,211,153,0.1)' : 'rgba(148,163,184,0.05)'}` }}>
-                                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: isCompleted ? '#34d399' : '#fbbf24', boxShadow: `0 0 6px ${isCompleted ? '#34d399' : '#fbbf24'}` }} />
-                                                    <span style={{ fontSize: 10, fontWeight: 700, color: isCompleted ? '#34d399' : '#fbbf24', textTransform: 'uppercase', letterSpacing: 0.8 }}>{isCompleted ? 'Finalizado' : 'Aguardando'}</span>
+                                                <div style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: `1px solid ${isCompleted ? 'rgba(52,211,153,0.1)' : isPlayableSwiss ? 'rgba(96,165,250,0.1)' : 'rgba(148,163,184,0.05)'}` }}>
+                                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: isCompleted ? '#34d399' : isPlayableSwiss ? '#60a5fa' : '#fbbf24', boxShadow: `0 0 6px ${isCompleted ? '#34d399' : isPlayableSwiss ? '#60a5fa' : '#fbbf24'}`, animation: isPlayableSwiss ? 'pulse 1.6s ease-in-out infinite' : 'none' }} />
+                                                    <span style={{ fontSize: 10, fontWeight: 700, color: isCompleted ? '#34d399' : isPlayableSwiss ? '#60a5fa' : '#fbbf24', textTransform: 'uppercase', letterSpacing: 0.8 }}>{isCompleted ? 'Finalizado' : isPlayableSwiss ? 'Pronto' : 'Aguardando'}</span>
                                                 </div>
                                                 {/* Players */}
                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 8, padding: '16px 12px' }}>
@@ -793,6 +1045,14 @@ export default function Matches() {
                             <div style={{ fontSize: 48 }}>⚔️</div>
                             <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: 16 }}>Sem confrontos ainda</div>
                             <div style={{ color: '#475569', fontSize: 13 }}>Crie uma seletiva para gerar os confrontos.</div>
+                        </div>
+                    )}
+
+                    {matches.length > 0 && filteredMatches.length === 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: 8, background: 'rgba(15,20,32,0.5)', border: '1px dashed rgba(148,163,184,0.15)', borderRadius: 14 }}>
+                            <Search size={28} color="#475569" />
+                            <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: 14 }}>Nenhum confronto encontrado</div>
+                            <div style={{ color: '#475569', fontSize: 12 }}>Tente outro nome ou apelido.</div>
                         </div>
                     )}
                 </>
@@ -887,6 +1147,59 @@ export default function Matches() {
                 </div >
             )
             }
+
+            {/* ── Head-to-Head Modal ── */}
+            {h2hModalPlayer && (() => {
+                const opponents = standings.filter(s => s.id !== h2hModalPlayer.id);
+                const completedMatches = matches.filter(m => m.status === 'completed' && m.winnerId);
+                return (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setH2hModalPlayer(null)}>
+                        <div style={{ background: 'linear-gradient(135deg, #1a2332, #111827)', border: '1px solid rgba(96,165,250,0.25)', borderRadius: 20, padding: 24, maxWidth: 480, width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid rgba(148,163,184,0.08)' }}>
+                                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(96,165,250,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                                    {h2hModalPlayer.photo ? <img src={h2hModalPlayer.photo} alt={h2hModalPlayer.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 16, fontWeight: 800, color: '#60a5fa' }}>{getInitials(h2hModalPlayer.name)}</span>}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: '#f1f5f9' }}>{h2hModalPlayer.name}</div>
+                                    <div style={{ fontSize: 12, color: '#60a5fa' }}>{h2hModalPlayer.wins}V · {h2hModalPlayer.losses}D · {h2hModalPlayer.points}pts</div>
+                                </div>
+                                <button onClick={() => setH2hModalPlayer(null)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}><XCircle size={20} /></button>
+                            </div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Confrontos diretos</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {opponents.map(op => {
+                                    const h2h = getH2HDetails(h2hModalPlayer.id, op.id, completedMatches);
+                                    if (h2h.total === 0) return (
+                                        <div key={op.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', opacity: 0.5 }}>
+                                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                {op.photo ? <img src={op.photo} alt={op.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700 }}>{getInitials(op.name)}</span>}
+                                            </div>
+                                            <span style={{ flex: 1, fontSize: 12, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{op.name}</span>
+                                            <span style={{ fontSize: 10, color: '#475569', fontStyle: 'italic' }}>sem partidas</span>
+                                        </div>
+                                    );
+                                    const winning = h2h.aWins > h2h.bWins;
+                                    const tied = h2h.aWins === h2h.bWins;
+                                    return (
+                                        <div key={op.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, background: winning ? 'rgba(52,211,153,0.06)' : tied ? 'rgba(148,163,184,0.05)' : 'rgba(239,68,68,0.06)', border: `1px solid ${winning ? 'rgba(52,211,153,0.18)' : tied ? 'rgba(148,163,184,0.12)' : 'rgba(239,68,68,0.18)'}` }}>
+                                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                {op.photo ? <img src={op.photo} alt={op.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>{getInitials(op.name)}</span>}
+                                            </div>
+                                            <span style={{ flex: 1, fontSize: 13, color: '#e2e8f0', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{op.name}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14 }}>
+                                                <span style={{ color: '#34d399' }}>{h2h.aWins}</span>
+                                                <span style={{ color: '#475569', fontSize: 11 }}>×</span>
+                                                <span style={{ color: '#f87171' }}>{h2h.bWins}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <p style={{ marginTop: 14, fontSize: 11, color: '#475569', textAlign: 'center' }}>Apenas confrontos desta seletiva</p>
+                        </div>
+                    </div>
+                );
+            })()}
 
             <TiebreakerHelpModal
                 isOpen={helpModalOpen}
