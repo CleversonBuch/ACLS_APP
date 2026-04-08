@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getRankings, getWinRate, getGlobalStats, getPlayerScore } from '../data/rankingEngine.js';
-import { getSelectives, getSettings } from '../data/db.js';
+import { getSelectives, getSettings, getMatches } from '../data/db.js';
+import { useAdmin } from '../contexts/AdminContext.jsx';
 import {
-    Users, Gamepad2, Flame, Target, Loader, TrendingUp,
-    Calendar, Trophy, Zap, Activity, ChevronUp, ChevronDown, Minus
+    Users, Gamepad2, Flame, Target, Loader, TrendingUp, PlusCircle, Swords, UserPlus,
+    Calendar, Trophy, Zap, Activity, ChevronUp, ChevronDown, Minus, ArrowRight, XCircle, Play, Clock
 } from 'lucide-react';
 import {
     LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -208,22 +210,27 @@ function PodiumPlayer({ player, place, isElo, getInitials }) {
 
 /* ── Main Component ────────────────────────────── */
 export default function Dashboard() {
+    const navigate = useNavigate();
+    const { isAdmin } = useAdmin();
     const [rankings, setRankings] = useState([]);
     const [stats, setStats] = useState({});
     const [selectives, setSelectives] = useState([]);
+    const [allMatches, setAllMatches] = useState([]);
     const [settings, setSettingsState] = useState({ rankingMode: 'points' });
     const [loading, setLoading] = useState(true);
+    const [h2hModalPlayer, setH2hModalPlayer] = useState(null);
 
     useEffect(() => { refresh(); }, []);
 
     async function refresh() {
         setLoading(true);
-        const [r, st, sel, set] = await Promise.all([
-            getRankings('points'), getGlobalStats(), getSelectives(), getSettings()
+        const [r, st, sel, set, matches] = await Promise.all([
+            getRankings('points'), getGlobalStats(), getSelectives(), getSettings(), getMatches()
         ]);
         setRankings(r);
         setStats(st || {});
         setSelectives(sel);
+        setAllMatches(matches || []);
         if (set) setSettingsState(set);
         setLoading(false);
     }
@@ -233,6 +240,91 @@ export default function Dashboard() {
     const top10 = rankings.slice(0, 10);
     const lastSelective = selectives.filter(s => s.status === 'completed').slice(-1)[0];
     const nextSelective = selectives.filter(s => s.status === 'active').slice(0, 1)[0];
+
+    // ── Active selective with progress ──
+    const activeSelectiveData = (() => {
+        const active = selectives.find(s => s.status === 'active' && s.eventType !== 'etapa');
+        if (!active) return null;
+        const selMatches = allMatches.filter(m => m.selectiveId === active.id);
+        const real = active.mode === 'elimination' ? selMatches.filter(m => m.player1Id && m.player2Id) : selMatches;
+        const completed = real.filter(m => m.status === 'completed').length;
+        const total = real.length;
+        const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+        const nextMatch = selMatches.find(m => m.status !== 'completed' && m.player1Id && m.player2Id);
+        return { selective: active, completed, total, progress, nextMatch };
+    })();
+
+    // ── Recent activity feed (last 10 completed matches) ──
+    const recentActivity = (() => {
+        const playersById = {};
+        rankings.forEach(p => { playersById[p.id] = p; });
+        const completed = allMatches
+            .filter(m => m.status === 'completed' && m.winnerId && m.player1Id && m.player2Id)
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
+            .slice(0, 10);
+        return completed.map(m => {
+            const winner = playersById[m.winnerId];
+            const loserId = m.winnerId === m.player1Id ? m.player2Id : m.player1Id;
+            const loser = playersById[loserId];
+            const sel = selectives.find(s => s.id === m.selectiveId);
+            return { match: m, winner, loser, selective: sel };
+        }).filter(x => x.winner && x.loser);
+    })();
+
+    // ── Em Alta: players with biggest position gain since last event ──
+    const trending = (() => {
+        if (rankings.length === 0) return [];
+        const currentPosMap = {};
+        rankings.forEach((p, i) => { currentPosMap[p.id] = i; });
+
+        // Build position from previous event using pointsHistory
+        const playersWithDelta = rankings.map((p, currentPos) => {
+            const hist = Array.isArray(p.pointsHistory) ? p.pointsHistory : [];
+            if (hist.length < 1) return { player: p, delta: 0, prevPoints: p.points || 0, hadPrev: false };
+            const last = hist[hist.length - 1];
+            const prevPoints = last.points || 0;
+            const currentPoints = p.points || 0;
+            const pointsDelta = currentPoints - prevPoints;
+            return { player: p, delta: pointsDelta, prevPoints, hadPrev: true };
+        });
+
+        return playersWithDelta
+            .filter(x => x.hadPrev && x.delta > 0)
+            .sort((a, b) => b.delta - a.delta)
+            .slice(0, 3);
+    })();
+
+    // ── Hot streaks: players with active streak >= 3 ──
+    const hotStreaks = rankings.filter(p => (p.streak || 0) >= 3).slice(0, 5);
+
+    // ── H2H helper for modal ──
+    function getH2HBetween(playerAId, playerBId) {
+        const h2hMatches = allMatches.filter(m =>
+            m.status === 'completed' && m.winnerId &&
+            ((m.player1Id === playerAId && m.player2Id === playerBId) ||
+             (m.player1Id === playerBId && m.player2Id === playerAId))
+        );
+        let aWins = 0, bWins = 0;
+        h2hMatches.forEach(m => {
+            if (m.winnerId === playerAId) aWins++;
+            else if (m.winnerId === playerBId) bWins++;
+        });
+        return { aWins, bWins, total: h2hMatches.length };
+    }
+
+    function timeAgo(dateStr) {
+        if (!dateStr) return '';
+        const diff = Date.now() - new Date(dateStr).getTime();
+        const m = Math.floor(diff / 60000);
+        if (m < 1) return 'agora';
+        if (m < 60) return `${m}m`;
+        const h = Math.floor(m / 60);
+        if (h < 24) return `${h}h`;
+        const d = Math.floor(h / 24);
+        if (d < 30) return `${d}d`;
+        const mo = Math.floor(d / 30);
+        return `${mo}mês`;
+    }
 
     /* Chart Data */
     const validSelectiveNames = new Set(selectives.map(s => s.name));
@@ -304,9 +396,13 @@ export default function Dashboard() {
             <style>{`
                 @keyframes fadeIn { from { opacity:0; transform:translateY(12px) } to { opacity:1; transform:translateY(0) } }
                 @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 20px rgba(52,211,153,0.15) } 50% { box-shadow: 0 0 40px rgba(52,211,153,0.3) } }
+                @keyframes pulse { 0%,100% { opacity:1; transform:scale(1) } 50% { opacity:0.5; transform:scale(1.2) } }
                 @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
                 .dash-row-hover:hover { background: rgba(52,211,153,0.04) !important; transform: translateX(2px); }
                 .dash-row-hover { transition: all 0.2s ease; }
+                .quick-action-btn:hover { transform: translateY(-2px); filter: brightness(1.15); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+                .activity-row:hover { background: rgba(255,255,255,0.04) !important; }
+                .activity-row { transition: background 0.18s ease; }
                 @media (max-width: 768px) {
                     .dash-podium-grid { grid-template-columns: 1fr !important; }
                     .top10-table-header { grid-template-columns: 48px 1fr 64px !important; }
@@ -351,6 +447,54 @@ export default function Dashboard() {
                     {isElo ? 'Sistema ELO' : 'Pontos Fixos'}
                 </div>
             </div>
+
+            {/* ── Quick Actions (admin only) ── */}
+            {isAdmin && (
+                <div style={{ marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                    {[
+                        { label: 'Nova Seletiva', icon: PlusCircle, color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.25)', path: '/nova-seletiva' },
+                        { label: 'Nova Etapa', icon: Swords, color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.25)', path: '/nova-etapa' },
+                        { label: 'Adicionar Jogador', icon: UserPlus, color: '#34d399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.25)', path: '/jogadores' },
+                    ].map(a => (
+                        <button key={a.path} onClick={() => navigate(a.path)} className="quick-action-btn" style={{
+                            display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderRadius: 14,
+                            border: `1px solid ${a.border}`, background: a.bg, color: a.color, cursor: 'pointer',
+                            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, transition: 'all 0.2s',
+                            textAlign: 'left',
+                        }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 10, background: `${a.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <a.icon size={18} />
+                            </div>
+                            <span style={{ flex: 1 }}>{a.label}</span>
+                            <ArrowRight size={14} style={{ opacity: 0.7 }} />
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* ── Hot Streaks Banner ── */}
+            {hotStreaks.length > 0 && (
+                <div style={{ marginBottom: 20, padding: '14px 18px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(251,146,60,0.08), rgba(15,20,32,0.98))', border: '1px solid rgba(251,146,60,0.22)', borderLeft: '3px solid #fb923c', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        <Flame size={18} color="#fb923c" />
+                        <div>
+                            <div style={{ fontSize: 9, fontWeight: 800, color: '#fb923c', letterSpacing: 1.2, textTransform: 'uppercase' }}>Em Sequência</div>
+                            <div style={{ fontSize: 11, color: '#64748b' }}>{hotStreaks.length} jogador{hotStreaks.length > 1 ? 'es' : ''} em chamas</div>
+                        </div>
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {hotStreaks.map(p => (
+                            <div key={p.id} onClick={() => setH2hModalPlayer(p)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 99, background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.25)', cursor: 'pointer' }}>
+                                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    {p.photo ? <img src={p.photo} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 9, color: '#fb923c', fontWeight: 800 }}>{getInitials(p.name)}</span>}
+                                </div>
+                                <span style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 600, whiteSpace: 'nowrap' }}>{p.nickname || p.name?.split(' ')[0]}</span>
+                                <span style={{ fontSize: 11, color: '#fb923c', fontWeight: 800 }}>🔥{p.streak}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* ── Stat Cards ── */}
             <div className="dash-stats-responsive" style={{
@@ -444,35 +588,81 @@ export default function Dashboard() {
                         background: 'linear-gradient(90deg, transparent, rgba(251,191,36,0.3), rgba(148,163,184,0.2), rgba(205,127,50,0.2), transparent)',
                     }} />
 
-                    {/* Selective pills */}
+                    {/* Active selective card OR fallback pills */}
                     <div style={{ padding: '14px 20px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {[
-                            { label: '📋 Última Seletiva', data: lastSelective },
-                            { label: '🎯 Próxima Seletiva', data: nextSelective },
-                        ].map(({ label, data }) => (
-                            <div key={label} style={{
-                                background: 'rgba(255,255,255,0.03)',
-                                border: '1px solid rgba(255,255,255,0.06)',
-                                borderRadius: 12, padding: '10px 14px',
-                                display: 'flex', alignItems: 'center', gap: 10,
-                            }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 10, color: '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-                                    {data ? (
-                                        <>
-                                            <div style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.name}</div>
-                                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
-                                                {data.mode === 'elimination' ? 'Eliminatória' : data.mode === 'round-robin' ? 'Todos contra Todos' : 'Sistema Suíço'}
-                                                {' · '}{data.playerIds?.length || 0} jogadores
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>Nenhuma</div>
-                                    )}
+                        {activeSelectiveData ? (
+                            <div onClick={() => navigate('/confrontos')} style={{
+                                background: 'linear-gradient(135deg, rgba(96,165,250,0.08), rgba(15,20,32,0.6))',
+                                border: '1px solid rgba(96,165,250,0.25)',
+                                borderRadius: 14, padding: '12px 14px',
+                                cursor: 'pointer', transition: 'all 0.2s',
+                            }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(96,165,250,0.15), rgba(15,20,32,0.6))'; e.currentTarget.style.borderColor = 'rgba(96,165,250,0.4)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(96,165,250,0.08), rgba(15,20,32,0.6))'; e.currentTarget.style.borderColor = 'rgba(96,165,250,0.25)'; }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#60a5fa', boxShadow: '0 0 8px #60a5fa', animation: 'pulse 1.6s ease-in-out infinite' }} />
+                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#60a5fa', letterSpacing: 1, textTransform: 'uppercase' }}>Em Andamento</span>
+                                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#60a5fa', fontWeight: 800 }}>{activeSelectiveData.progress}%</span>
                                 </div>
-                                <Calendar size={14} color="#475569" style={{ flexShrink: 0 }} />
+                                <div style={{ fontWeight: 700, fontSize: 14, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>{activeSelectiveData.selective.name}</div>
+                                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+                                    {activeSelectiveData.completed}/{activeSelectiveData.total} partidas · {activeSelectiveData.selective.playerIds?.length || 0} jogadores
+                                </div>
+                                <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
+                                    <div style={{ height: '100%', width: `${activeSelectiveData.progress}%`, background: 'linear-gradient(90deg, #3b82f6, #60a5fa)', borderRadius: 99, transition: 'width 0.5s ease', boxShadow: '0 0 8px rgba(96,165,250,0.4)' }} />
+                                </div>
+                                {activeSelectiveData.nextMatch && (() => {
+                                    const np1 = rankings.find(p => p.id === activeSelectiveData.nextMatch.player1Id);
+                                    const np2 = rankings.find(p => p.id === activeSelectiveData.nextMatch.player2Id);
+                                    return (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', fontSize: 11, color: '#94a3b8' }}>
+                                            <Play size={10} fill="#60a5fa" color="#60a5fa" />
+                                            <span style={{ fontWeight: 600, color: '#60a5fa' }}>Próxima:</span>
+                                            <span style={{ fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{np1?.name?.split(' ')[0] || '?'}</span>
+                                            <span style={{ color: '#475569' }}>vs</span>
+                                            <span style={{ fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{np2?.name?.split(' ')[0] || '?'}</span>
+                                        </div>
+                                    );
+                                })()}
+                                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, fontSize: 11, color: '#60a5fa', fontWeight: 700 }}>
+                                    Ir para Seletiva <ArrowRight size={11} />
+                                </div>
                             </div>
-                        ))}
+                        ) : (
+                            [
+                                { label: '📋 Última Seletiva', data: lastSelective },
+                                { label: '🎯 Próxima Seletiva', data: nextSelective },
+                            ].map(({ label, data }) => (
+                                <div key={label} onClick={() => data && navigate('/confrontos')} style={{
+                                    background: 'rgba(255,255,255,0.03)',
+                                    border: '1px solid rgba(255,255,255,0.06)',
+                                    borderRadius: 12, padding: '10px 14px',
+                                    display: 'flex', alignItems: 'center', gap: 10,
+                                    cursor: data ? 'pointer' : 'default',
+                                    transition: 'all 0.2s',
+                                }}
+                                    onMouseEnter={e => { if (data) { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; } }}
+                                    onMouseLeave={e => { if (data) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; } }}
+                                >
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 10, color: '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+                                        {data ? (
+                                            <>
+                                                <div style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.name}</div>
+                                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
+                                                    {data.mode === 'elimination' ? 'Eliminatória' : data.mode === 'round-robin' ? 'Todos contra Todos' : 'Sistema Suíço'}
+                                                    {' · '}{data.playerIds?.length || 0} jogadores
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>Nenhuma</div>
+                                        )}
+                                    </div>
+                                    <Calendar size={14} color="#475569" style={{ flexShrink: 0 }} />
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
 
@@ -558,6 +748,100 @@ export default function Dashboard() {
                 </div>
             </div>
 
+            {/* ── Recent Activity + Em Alta (2 col) ── */}
+            {(recentActivity.length > 0 || trending.length > 0) && (
+                <div className="dash-podium-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 20, marginBottom: 24 }}>
+
+                    {/* Recent Activity Feed */}
+                    <div style={{
+                        background: 'linear-gradient(135deg, rgba(26,35,50,0.95) 0%, rgba(15,20,32,0.98) 100%)',
+                        border: '1px solid rgba(96,165,250,0.1)',
+                        borderRadius: 22, overflow: 'hidden', position: 'relative',
+                    }}>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #60a5fa, transparent)' }} />
+                        <div style={{ padding: '20px 24px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Activity size={18} color="#60a5fa" />
+                            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>Atividade Recente</span>
+                            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#475569', background: 'rgba(255,255,255,0.04)', padding: '2px 10px', borderRadius: 20 }}>Últimas {recentActivity.length}</span>
+                        </div>
+                        {recentActivity.length === 0 ? (
+                            <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+                                <Clock size={32} color="#334155" style={{ marginBottom: 10 }} />
+                                <div style={{ color: '#64748b', fontSize: 13 }}>Sem partidas registradas</div>
+                            </div>
+                        ) : (
+                            <div style={{ padding: '4px 12px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {recentActivity.map(({ match, winner, loser, selective }) => (
+                                    <div key={match.id} className="activity-row" onClick={() => setH2hModalPlayer(winner)} style={{
+                                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                                            <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(52,211,153,0.1)', border: '1.5px solid rgba(52,211,153,0.3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                {winner.photo ? <img src={winner.photo} alt={winner.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 9, color: '#34d399', fontWeight: 800 }}>{getInitials(winner.name)}</span>}
+                                            </div>
+                                            <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>{winner.nickname || winner.name?.split(' ')[0]}</span>
+                                            <span style={{ fontSize: 10, color: '#475569', fontWeight: 600 }}>venceu</span>
+                                            <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>{loser.nickname || loser.name?.split(' ')[0]}</span>
+                                        </div>
+                                        {selective && (
+                                            <span className="hide-mob" style={{ fontSize: 10, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 110, padding: '2px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>{selective.name}</span>
+                                        )}
+                                        <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>{timeAgo(match.updatedAt || match.createdAt)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Em Alta */}
+                    <div style={{
+                        background: 'linear-gradient(135deg, rgba(26,35,50,0.95) 0%, rgba(15,20,32,0.98) 100%)',
+                        border: '1px solid rgba(52,211,153,0.12)',
+                        borderRadius: 22, overflow: 'hidden', position: 'relative',
+                    }}>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #34d399, transparent)' }} />
+                        <div style={{ padding: '20px 24px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <TrendingUp size={18} color="#34d399" />
+                            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>Em Alta</span>
+                            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#34d399', background: 'rgba(52,211,153,0.08)', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>Maior ganho</span>
+                        </div>
+                        {trending.length === 0 ? (
+                            <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+                                <TrendingUp size={32} color="#334155" style={{ marginBottom: 10 }} />
+                                <div style={{ color: '#64748b', fontSize: 13 }}>Aguardando próxima seletiva</div>
+                                <div style={{ color: '#475569', fontSize: 11, marginTop: 4 }}>Os destaques aparecem após eventos finalizados</div>
+                            </div>
+                        ) : (
+                            <div style={{ padding: '4px 16px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {trending.map((t, i) => (
+                                    <div key={t.player.id} onClick={() => setH2hModalPlayer(t.player)} style={{
+                                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12,
+                                        background: i === 0 ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.02)',
+                                        border: `1px solid ${i === 0 ? 'rgba(52,211,153,0.2)' : 'rgba(255,255,255,0.04)'}`,
+                                        cursor: 'pointer', transition: 'all 0.2s',
+                                    }}
+                                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(3px)'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateX(0)'; }}
+                                    >
+                                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(52,211,153,0.3)', flexShrink: 0 }}>
+                                            {t.player.photo ? <img src={t.player.photo} alt={t.player.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 11, color: '#34d399', fontWeight: 800 }}>{getInitials(t.player.name)}</span>}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.player.name}</div>
+                                            <div style={{ fontSize: 10, color: '#64748b' }}>antes: {t.prevPoints}pts → agora: {t.player.points || 0}pts</div>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 10px', borderRadius: 99, background: 'rgba(52,211,153,0.12)', flexShrink: 0 }}>
+                                            <ChevronUp size={12} color="#34d399" strokeWidth={3} />
+                                            <span style={{ fontSize: 12, fontWeight: 800, color: '#34d399' }}>+{t.delta}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* ── Top 10 Table ── */}
             <div style={{
                 background: 'linear-gradient(135deg, rgba(26,35,50,0.95) 0%, rgba(15,20,32,0.98) 100%)',
@@ -610,7 +894,7 @@ export default function Dashboard() {
                             const winRate = getWinRate(player);
 
                             return (
-                                <div key={player.id} className="dash-row-hover top10-table-row" style={{
+                                <div key={player.id} onClick={() => setH2hModalPlayer(player)} className="dash-row-hover top10-table-row" style={{
                                     display: 'grid',
                                     gridTemplateColumns: '48px 1fr 100px 52px 52px 64px 64px',
                                     alignItems: 'center',
@@ -619,6 +903,7 @@ export default function Dashboard() {
                                     marginBottom: 2,
                                     background: isTop3 ? `rgba(${index === 0 ? '251,191,36' : index === 1 ? '148,163,184' : '205,127,50'},0.04)` : 'transparent',
                                     border: isTop3 ? `1px solid rgba(${index === 0 ? '251,191,36' : index === 1 ? '148,163,184' : '205,127,50'},0.08)` : '1px solid transparent',
+                                    cursor: 'pointer',
                                 }}>
                                     {/* Rank */}
                                     <div>
@@ -716,6 +1001,58 @@ export default function Dashboard() {
                     </div>
                 )}
             </div>
+
+            {/* ── H2H Modal ── */}
+            {h2hModalPlayer && (() => {
+                const opponents = rankings.filter(p => p.id !== h2hModalPlayer.id);
+                const playerWinRate = getWinRate(h2hModalPlayer);
+                return (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(8px)', padding: 16 }} onClick={() => setH2hModalPlayer(null)}>
+                        <div style={{ background: 'linear-gradient(135deg, #1a2332, #111827)', border: '1px solid rgba(96,165,250,0.25)', borderRadius: 20, padding: 24, maxWidth: 480, width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid rgba(148,163,184,0.08)' }}>
+                                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '2px solid rgba(96,165,250,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                                    {h2hModalPlayer.photo ? <img src={h2hModalPlayer.photo} alt={h2hModalPlayer.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{getInitials(h2hModalPlayer.name)}</span>}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{h2hModalPlayer.name}</div>
+                                    <div style={{ fontSize: 12, color: '#60a5fa' }}>{h2hModalPlayer.wins || 0}V · {h2hModalPlayer.losses || 0}D · {playerWinRate}% · {h2hModalPlayer.points || 0}pts</div>
+                                </div>
+                                <button onClick={() => setH2hModalPlayer(null)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}><XCircle size={20} /></button>
+                            </div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Confrontos diretos (todas as seletivas)</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {opponents.map(op => {
+                                    const h2h = getH2HBetween(h2hModalPlayer.id, op.id);
+                                    if (h2h.total === 0) return (
+                                        <div key={op.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', opacity: 0.4 }}>
+                                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                {op.photo ? <img src={op.photo} alt={op.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700 }}>{getInitials(op.name)}</span>}
+                                            </div>
+                                            <span style={{ flex: 1, fontSize: 12, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{op.name}</span>
+                                            <span style={{ fontSize: 10, color: '#475569', fontStyle: 'italic' }}>sem partidas</span>
+                                        </div>
+                                    );
+                                    const winning = h2h.aWins > h2h.bWins;
+                                    const tied = h2h.aWins === h2h.bWins;
+                                    return (
+                                        <div key={op.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, background: winning ? 'rgba(52,211,153,0.06)' : tied ? 'rgba(148,163,184,0.05)' : 'rgba(239,68,68,0.06)', border: `1px solid ${winning ? 'rgba(52,211,153,0.18)' : tied ? 'rgba(148,163,184,0.12)' : 'rgba(239,68,68,0.18)'}` }}>
+                                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                {op.photo ? <img src={op.photo} alt={op.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>{getInitials(op.name)}</span>}
+                                            </div>
+                                            <span style={{ flex: 1, fontSize: 13, color: '#e2e8f0', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{op.name}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14 }}>
+                                                <span style={{ color: '#34d399' }}>{h2h.aWins}</span>
+                                                <span style={{ color: '#475569', fontSize: 11 }}>×</span>
+                                                <span style={{ color: '#f87171' }}>{h2h.bWins}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
