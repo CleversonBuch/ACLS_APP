@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { getSelectives, getPlayer, getPlayers, updateSelective, deleteSelective, updatePlayer } from '../data/db.js';
-import { applyFixedPoints } from '../data/rankingEngine.js';
-import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Swords, Shield, Loader, Trophy, Medal, Award } from 'lucide-react';
+import { applyFixedPoints, recalculateAllRankings } from '../data/rankingEngine.js';
+import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Swords, Shield, Loader, Trophy, Medal, Award, RefreshCw, Crown, Star, Flame, MapPin, Calendar, FileText, Activity, TrendingUp } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext.jsx';
+
+function getInitials(name) {
+    return name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
+}
 
 export default function Etapas() {
     const { isAdmin } = useAdmin();
@@ -16,6 +20,15 @@ export default function Etapas() {
     const [wizardStep, setWizardStep] = useState(0); // 0=hidden, 1=pick players, 2=team name, 3=assign opponents
     const [wizardData, setWizardData] = useState({ selectedPlayers: [], opponentTeam: '', opponents: ['', '', '', '', ''] });
     const [allPlayersArray, setAllPlayersArray] = useState([]);
+    const [recalculating, setRecalculating] = useState(false);
+
+    async function handleRecalculate() {
+        if (recalculating) return;
+        setRecalculating(true);
+        try { await recalculateAllRankings(); }
+        catch (e) { console.error(e); }
+        finally { setRecalculating(false); setRefresh(r => r + 1); }
+    }
 
     useEffect(() => {
         async function loadData() {
@@ -92,6 +105,41 @@ export default function Etapas() {
     const isFinalized = ['champion', 'runner-up', 'third'].includes(teamStatus);
     const canAddConfront = isActive && !isFinalized;
 
+    // ── Per-player stats within this etapa ──
+    const playerStatsInEtapa = (() => {
+        const stats = {};
+        mappedConfronts.forEach(c => {
+            (c.slots || []).forEach(slot => {
+                if (!slot.playerId) return;
+                if (!stats[slot.playerId]) stats[slot.playerId] = { wins: 0, losses: 0, total: 0 };
+                if (slot.result === 'win') { stats[slot.playerId].wins++; stats[slot.playerId].total++; }
+                else if (slot.result === 'loss') { stats[slot.playerId].losses++; stats[slot.playerId].total++; }
+            });
+        });
+        return stats;
+    })();
+
+    // MVP: jogador com mais vitórias na etapa
+    const mvpEntry = Object.entries(playerStatsInEtapa)
+        .sort(([, a], [, b]) => (b.wins - a.wins) || (a.losses - b.losses))[0];
+    const mvpId = mvpEntry?.[0];
+    const mvp = mvpId ? playersMap[mvpId] : null;
+    const mvpStats = mvpEntry?.[1];
+
+    // Progress: confrontos finalizados vs total
+    const totalConfrontos = mappedConfronts.length;
+    const finishedConfrontos = mappedConfronts.filter(c => c.isFinished).length;
+    const progressPct = totalConfrontos > 0 ? Math.round((finishedConfrontos / totalConfrontos) * 100) : 0;
+
+    // Total individual matches stats
+    const totalIndividualWins = Object.values(playerStatsInEtapa).reduce((sum, s) => sum + s.wins, 0);
+    const totalIndividualLosses = Object.values(playerStatsInEtapa).reduce((sum, s) => sum + s.losses, 0);
+
+    // Per confronto, find next pending slot for "Next match" highlight
+    function getNextPendingSlot(c) {
+        return (c.slots || []).find(s => s.result == null);
+    }
+
     const STATUS_OPTIONS = [
         { key: 'active', label: 'Em Disputa', emoji: '⚔️', color: 'var(--gold-400)', bg: 'rgba(234,179,8,0.08)', border: 'rgba(234,179,8,0.25)' },
         { key: 'eliminated', label: 'Eliminada', emoji: '🚨', color: 'var(--red-400)', bg: 'rgba(239,68,68,0.05)', border: 'rgba(239,68,68,0.3)' },
@@ -152,41 +200,189 @@ export default function Etapas() {
     }
 
     return (
-        <div className="animate-fade-in" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-            <div className="page-header">
+        <div style={{ opacity: loading ? 0.65 : 1, transition: 'opacity 0.25s', animation: 'fadeInUp 0.4s ease' }}>
+            <style>{`
+                @keyframes fadeInUp { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
+                @keyframes spin { to { transform: rotate(360deg) } }
+                @keyframes pulse { 0%,100% { opacity:1; transform:scale(1) } 50% { opacity:0.5; transform:scale(1.2) } }
+                .etapa-tab { transition: all 0.2s; }
+                .etapa-tab:hover:not(.active) { background: rgba(251,191,36,0.08) !important; color: #e2e8f0 !important; }
+            `}</style>
+
+            {/* ── Premium Header ── */}
+            <div className="sel-header-wrap" style={{ marginBottom: 22, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
                 <div>
-                    <h1 className="page-title">Etapas</h1>
-                    <p className="page-subtitle">Gerenciar confrontos 5x5 contra outras equipes</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                        <div style={{ width: 6, height: 32, borderRadius: 3, background: 'linear-gradient(180deg, #fbbf24, #f59e0b)' }} />
+                        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 800, color: '#f1f5f9', margin: 0, letterSpacing: -0.5, display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Trophy size={24} color="#fbbf24" /> Etapas
+                        </h1>
+                    </div>
+                    <p style={{ color: '#475569', fontSize: 14, marginLeft: 16 }}>Gerenciar confrontos 5x5 contra outras equipes</p>
                 </div>
-                {isAdmin && (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        {activeSelective && (
-                            <button className="btn btn-danger btn-sm" onClick={() => !loading && setDeleteConfirmStep(1)} disabled={loading}>
-                                <Trash2 size={16} /> Apagar Etapa
-                            </button>
-                        )}
+                {isAdmin && activeSelective && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button onClick={handleRecalculate} disabled={recalculating || loading} title="Reprocessa pontos, ELO e estatísticas" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(96,165,250,0.25)', background: 'rgba(96,165,250,0.08)', color: '#60a5fa', fontSize: 12, fontWeight: 600, cursor: recalculating ? 'wait' : 'pointer', opacity: recalculating ? 0.7 : 1 }}>
+                            <RefreshCw size={14} style={{ animation: recalculating ? 'spin 0.8s linear infinite' : 'none' }} /> {recalculating ? 'Recalculando…' : 'Recalcular'}
+                        </button>
+                        <button onClick={() => !loading && setDeleteConfirmStep(1)} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)', color: '#f87171', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                            <Trash2 size={14} /> Apagar Etapa
+                        </button>
                     </div>
                 )}
             </div>
 
-            {/* Etapa Selector */}
+            {/* ── Etapa Tabs (premium) ── */}
             {selectives.length > 0 && (
-                <div className="season-tabs" style={{ marginBottom: 20 }}>
-                    {selectives.map(s => (
-                        <button
-                            key={s.id}
-                            className={`season-tab ${activeSelectiveId === s.id ? 'active' : ''}`}
-                            onClick={() => !loading && setActiveSelectiveId(s.id)}
-                            disabled={loading}
-                        >
-                            {getTabEmoji(s)} {s.name}
-                        </button>
-                    ))}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+                    {selectives.map(s => {
+                        const isActiveTab = activeSelectiveId === s.id;
+                        const st = s.teamStatus || 'active';
+                        const isDone = s.status === 'completed';
+                        const cf = (s.teamConfronts || []);
+                        const total = cf.length;
+                        const finished = cf.filter(c => {
+                            const slots = c.slots || [];
+                            const w = slots.filter(x => x.result === 'win').length;
+                            const l = slots.filter(x => x.result === 'loss').length;
+                            return w >= 3 || l >= 3;
+                        }).length;
+                        const statColor = st === 'champion' ? '#fbbf24' : st === 'runner-up' ? '#94a3b8' : st === 'third' ? '#cd7f32' : st === 'eliminated' ? '#f87171' : '#fbbf24';
+                        return (
+                            <button key={s.id} className={`etapa-tab ${isActiveTab ? 'active' : ''}`} onClick={() => !loading && setActiveSelectiveId(s.id)} disabled={loading} style={{
+                                padding: '10px 16px', borderRadius: 12,
+                                border: `1px solid ${isActiveTab ? `${statColor}55` : 'rgba(255,255,255,0.06)'}`,
+                                background: isActiveTab ? `linear-gradient(135deg, ${statColor}20, ${statColor}08)` : 'rgba(255,255,255,0.03)',
+                                color: isActiveTab ? statColor : '#64748b',
+                                fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                boxShadow: isActiveTab ? `0 0 16px ${statColor}15` : 'none',
+                            }}>
+                                <span style={{ fontSize: 14 }}>{getTabEmoji(s)}</span>
+                                <div style={{ textAlign: 'left' }}>
+                                    <div style={{ fontFamily: 'var(--font-display)' }}>{s.name}</div>
+                                    {total > 0 && <div style={{ fontSize: 9, color: isActiveTab ? statColor : '#475569', opacity: 0.85, marginTop: 1 }}>{finished}/{total} confrontos</div>}
+                                </div>
+                                {isDone && <span style={{ fontSize: 9, fontWeight: 800, color: '#34d399', background: 'rgba(52,211,153,0.12)', padding: '2px 6px', borderRadius: 5 }}>✓</span>}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
 
             {activeSelective && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 20 }}>
+
+                    {/* ── Etapa Info Bar (date/location/description) ── */}
+                    {(activeSelective?.config?.scheduledDate || activeSelective?.config?.location || activeSelective?.config?.description) && (
+                        <div style={{ background: 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: '1px solid rgba(148,163,184,0.08)', borderRadius: 14, padding: '12px 18px', display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+                            {activeSelective.config.scheduledDate && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8' }}>
+                                    <Calendar size={12} color="#60a5fa" />
+                                    <span>{new Date(activeSelective.config.scheduledDate).toLocaleDateString('pt-BR')}</span>
+                                </div>
+                            )}
+                            {activeSelective.config.location && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8' }}>
+                                    <MapPin size={12} color="#34d399" />
+                                    <span>{activeSelective.config.location}</span>
+                                </div>
+                            )}
+                            {activeSelective.config.description && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8', flex: 1, minWidth: 200 }}>
+                                    <FileText size={12} color="#fbbf24" />
+                                    <span style={{ fontStyle: 'italic' }}>{activeSelective.config.description}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Progress Bar ── */}
+                    {totalConfrontos > 0 && (
+                        <div style={{ background: 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: '1px solid rgba(96,165,250,0.12)', borderRadius: 18, padding: '18px 22px', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #60a5fa, transparent)' }} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Activity size={15} color="#60a5fa" />
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8' }}>Progresso da Etapa</span>
+                                    <span style={{ fontSize: 12, color: '#475569' }}>{finishedConfrontos}/{totalConfrontos} confronto{totalConfrontos !== 1 ? 's' : ''}</span>
+                                    {totalIndividualWins + totalIndividualLosses > 0 && (
+                                        <span style={{ fontSize: 11, color: '#475569', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 99, marginLeft: 4 }}>
+                                            {totalIndividualWins + totalIndividualLosses} jogos individuais
+                                        </span>
+                                    )}
+                                </div>
+                                <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 900, color: progressPct === 100 ? '#34d399' : '#60a5fa', letterSpacing: -1 }}>{progressPct}%</span>
+                            </div>
+                            <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 999, overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${progressPct}%`, background: progressPct === 100 ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #3b82f6, #60a5fa)', borderRadius: 999, transition: 'width 0.5s ease', boxShadow: progressPct > 0 ? `0 0 12px ${progressPct === 100 ? 'rgba(52,211,153,0.4)' : 'rgba(96,165,250,0.4)'}` : 'none' }} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── MVP Card (when there are some results) ── */}
+                    {mvp && mvpStats && mvpStats.wins > 0 && (
+                        <div style={{ background: 'linear-gradient(135deg, rgba(167,139,250,0.06), rgba(15,20,32,0.98))', border: '1px solid rgba(167,139,250,0.2)', borderLeft: '3px solid #a78bfa', borderRadius: 18, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: '2px solid rgba(167,139,250,0.4)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 24px rgba(167,139,250,0.2)' }}>
+                                {mvp.photo ? <img src={mvp.photo} alt={mvp.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 16, fontWeight: 800, color: '#a78bfa' }}>{getInitials(mvp.name)}</span>}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                    <Star size={12} color="#a78bfa" fill="#a78bfa" />
+                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', letterSpacing: 1.2, textTransform: 'uppercase' }}>{isFinalized ? 'MVP da Etapa' : 'Destaque até agora'}</span>
+                                </div>
+                                <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 800, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mvp.name}</div>
+                                <div style={{ fontSize: 11, color: '#94a3b8' }}>{mvpStats.wins} vitória{mvpStats.wins !== 1 ? 's' : ''} · {mvpStats.losses} derrota{mvpStats.losses !== 1 ? 's' : ''}</div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, fontFamily: 'var(--font-display)', fontWeight: 900 }}>
+                                <span style={{ fontSize: 28, color: '#a78bfa', textShadow: '0 0 12px rgba(167,139,250,0.5)' }}>{mvpStats.wins}</span>
+                                <span style={{ fontSize: 11, color: '#a78bfa', opacity: 0.7 }}>V</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Player Stats Summary in this Etapa ── */}
+                    {Object.keys(playerStatsInEtapa).length > 0 && (
+                        <div style={{ background: 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))', border: '1px solid rgba(148,163,184,0.08)', borderRadius: 18, overflow: 'hidden' }}>
+                            <div style={{ position: 'relative' }}>
+                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, rgba(148,163,184,0.3), transparent)' }} />
+                            </div>
+                            <div style={{ padding: '14px 20px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <TrendingUp size={15} color="#94a3b8" />
+                                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: '#f1f5f9' }}>Desempenho dos Jogadores</span>
+                                <span style={{ marginLeft: 'auto', fontSize: 10, color: '#475569', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 99 }}>nesta etapa</span>
+                            </div>
+                            <div style={{ padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {Object.entries(playerStatsInEtapa)
+                                    .sort(([, a], [, b]) => (b.wins - a.wins) || (a.losses - b.losses))
+                                    .map(([pid, st]) => {
+                                        const p = playersMap[pid];
+                                        if (!p) return null;
+                                        const wr = st.total > 0 ? Math.round((st.wins / st.total) * 100) : 0;
+                                        const wrColor = wr >= 60 ? '#34d399' : wr >= 40 ? '#fbbf24' : '#f87171';
+                                        return (
+                                            <div key={pid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 10, background: pid === mvpId ? 'rgba(167,139,250,0.05)' : 'transparent', border: pid === mvpId ? '1px solid rgba(167,139,250,0.15)' : '1px solid transparent' }}>
+                                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `1.5px solid ${wrColor}30`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    {p.photo ? <img src={p.photo} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, fontWeight: 800, color: wrColor }}>{getInitials(p.name)}</span>}
+                                                </div>
+                                                <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                                                {pid === mvpId && <Star size={11} color="#a78bfa" fill="#a78bfa" />}
+                                                <div style={{ display: 'flex', gap: 6, fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 13 }}>
+                                                    <span style={{ color: '#34d399', minWidth: 18, textAlign: 'right' }}>{st.wins}V</span>
+                                                    <span style={{ color: '#475569' }}>·</span>
+                                                    <span style={{ color: '#f87171', minWidth: 18 }}>{st.losses}D</span>
+                                                </div>
+                                                <div style={{ width: 50, height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden', flexShrink: 0 }}>
+                                                    <div style={{ height: '100%', width: `${wr}%`, background: wrColor, borderRadius: 99 }} />
+                                                </div>
+                                                <span style={{ fontSize: 10, fontWeight: 700, color: wrColor, width: 32, textAlign: 'right' }}>{wr}%</span>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* ETAPA SUMMARY HEADER */}
                     {(workingConfronts.length > 0 || wizardStep > 0) && (
                         <div className="card" style={{
@@ -655,10 +851,24 @@ export default function Etapas() {
 
             {
                 selectives.length === 0 && !loading && (
-                    <div className="empty-state">
-                        <div className="empty-state-icon">🏆</div>
-                        <div className="empty-state-title">Nenhuma etapa oficial iniciada</div>
-                        <div className="empty-state-desc">Vá para o painel de criação para configurar</div>
+                    <div style={{
+                        background: 'linear-gradient(135deg, rgba(26,35,50,0.95), rgba(15,20,32,0.98))',
+                        border: '1px dashed rgba(251,191,36,0.2)',
+                        borderRadius: 22, padding: '60px 32px', textAlign: 'center',
+                        marginTop: 24,
+                    }}>
+                        <div style={{ width: 72, height: 72, borderRadius: 18, background: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(245,158,11,0.05))', border: '1px solid rgba(251,191,36,0.25)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, boxShadow: '0 0 32px rgba(251,191,36,0.1)' }}>
+                            <Trophy size={32} color="#fbbf24" />
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: '#f1f5f9', marginBottom: 6 }}>Nenhuma etapa oficial criada</div>
+                        <div style={{ fontSize: 13, color: '#64748b', maxWidth: 360, margin: '0 auto 20px' }}>
+                            Crie uma etapa para gerenciar confrontos 5x5 contra equipes externas. Cada vitória individual conta para o ranking dos jogadores.
+                        </div>
+                        {isAdmin && (
+                            <a href="/nova-etapa" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 22px', borderRadius: 12, background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', color: '#111827', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, textDecoration: 'none', boxShadow: '0 8px 24px rgba(251,191,36,0.3)' }}>
+                                <Swords size={16} /> Criar Primeira Etapa
+                            </a>
+                        )}
                     </div>
                 )
             }
