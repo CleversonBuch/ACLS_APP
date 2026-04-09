@@ -5,15 +5,33 @@
  * Implementa:
  *  - Laplace Smoothing para força do jogador
  *  - Peso por volume de jogos (credibilidade)
- *  - Calibração anti-superconfiança (P_calibrada)
+ *  - Calibração anti-superconfiança (P_calibrada) — reforçada para underdogs
  *  - Ajuste por progresso do campeonato (P_final)
  *  - Momentum (últimos resultados)
  *  - Força do adversário (qualidade das vitórias)
  *  - Volatilidade (inconsistência)
- *  - 2000 simulações mínimas
+ *  - Pré-check matemático (impossível vs apenas improvável)
+ *  - Ranking com desempates corretos (pontos → vitórias → derrotas)
+ *  - Floor de 1% para cenários matematicamente possíveis
+ *  - 5000 simulações para resolução fina de underdogs
  */
 
-const SIMULATIONS = 2000;
+const SIMULATIONS = 5000;
+
+/**
+ * Verifica se o jogador PODE matematicamente terminar no Top 5
+ * vencendo TODOS os seus jogos restantes.
+ */
+function canMathematicallyReachTop5(player, standings, pendingMatches, ptsWin) {
+    const remainingForPlayer = pendingMatches.filter(m =>
+        m.player1Id === player.id || m.player2Id === player.id
+    ).length;
+    const maxPoints = (player.points || 0) + remainingForPlayer * ptsWin;
+    // Quantos jogadores TÊM mais pontos atuais que o máximo possível dela?
+    // Esses já são intransponíveis mesmo no melhor cenário.
+    const intransponiveis = standings.filter(s => s.id !== player.id && (s.points || 0) > maxPoints).length;
+    return intransponiveis < 5;
+}
 
 /**
  * Calcula as chances de cada jogador terminar no Top 5.
@@ -51,7 +69,6 @@ export function computeTop5Chances(standings, matches, activeSelective) {
     });
 
     // ── MELHORIA: Força do adversário (qualidade das vitórias) ──
-    // Soma a força inicial dos adversários derrotados, normaliza
     const opponentBonus = {};
     standings.forEach(s => { opponentBonus[s.id] = 0; });
     completedMatches.forEach(m => {
@@ -60,7 +77,6 @@ export function computeTop5Chances(standings, matches, activeSelective) {
             opponentBonus[m.winnerId] += playerStrength[loserId];
         }
     });
-    // Normalizar: max bonus = 0.1 (adicional à força base)
     const maxBonus = Math.max(...Object.values(opponentBonus), 0.001);
     const strengthWithBonus = {};
     standings.forEach(s => {
@@ -68,7 +84,6 @@ export function computeTop5Chances(standings, matches, activeSelective) {
     });
 
     // ── MELHORIA: Momentum (últimas 2 partidas) ──
-    // +5% se venceu as últimas 2 e -3% se perdeu as últimas 2
     const momentumFactor = {};
     standings.forEach(s => { momentumFactor[s.id] = 0; });
     standings.forEach(s => {
@@ -86,24 +101,21 @@ export function computeTop5Chances(standings, matches, activeSelective) {
     });
 
     // ── MELHORIA: Volatilidade ──
-    // Jogadores com winrate entre 40%-60% têm variação aleatória extra na simulação
     const volatility = {};
     standings.forEach(s => {
         const total = s.wins + s.losses;
         if (total > 0) {
             const wr = s.wins / total;
-            // Mais perto de 50% → mais volátil
             volatility[s.id] = 1 - Math.abs(wr - 0.5) * 2;
         } else {
-            volatility[s.id] = 1; // Sem histórico = máxima incerteza
+            volatility[s.id] = 1;
         }
     });
 
-    // ── Força final combinada (antes de multiplicar pelo progresso) ──
+    // ── Força final combinada ──
     const finalStrength = {};
     standings.forEach(s => {
         const raw = (strengthWithBonus[s.id] || playerStrength[s.id]) + momentumFactor[s.id];
-        // Clamp entre 0.05 e 0.95 para evitar extremos
         finalStrength[s.id] = Math.max(0.05, Math.min(0.95, raw));
     });
 
@@ -128,7 +140,6 @@ export function computeTop5Chances(standings, matches, activeSelective) {
         let strA = finalStrength[pm.player1Id] ?? 0.5;
         let strB = finalStrength[pm.player2Id] ?? 0.5;
 
-        // ── Ajuste de Confronto Direto (apenas para este par) ──
         if (h2hWins[pm.player1Id]?.[pm.player2Id]) {
             strA *= 1.05;
             strB *= 0.95;
@@ -137,16 +148,15 @@ export function computeTop5Chances(standings, matches, activeSelective) {
             strA *= 0.95;
         }
 
-        // ── ETAPA 3: Probabilidade de confronto ──
         const p_base = strA / (strA + strB);
 
-        // ── ETAPA 4: Calibração anti-superconfiança ──
-        const p_calibrada = p_base * 0.9 + 0.1 * 0.5;
+        // ── ETAPA 4: Calibração anti-superconfiança (REFORÇADA) ──
+        // Era 0.9/0.1 → puxa mais para 0.5 (20% peso na incerteza)
+        const p_calibrada = p_base * 0.8 + 0.2 * 0.5;
 
         // ── ETAPA 5: Ajuste por progresso ──
         const p_final_base = p_calibrada * progresso + 0.5 * (1 - progresso);
 
-        // Volatilidade para ruído
         const vol = (volatility[pm.player1Id] || 0) * 0.05;
 
         return {
@@ -162,23 +172,41 @@ export function computeTop5Chances(standings, matches, activeSelective) {
     standings.forEach(s => { chances[s.id] = 0; });
 
     for (let i = 0; i < SIMULATIONS; i++) {
+        // Estado simulado: pontos + vitórias + derrotas (para desempates corretos)
         const simPoints = {};
-        standings.forEach(s => { simPoints[s.id] = s.points; });
+        const simWins = {};
+        const simLosses = {};
+        standings.forEach(s => {
+            simPoints[s.id] = s.points;
+            simWins[s.id] = s.wins || 0;
+            simLosses[s.id] = s.losses || 0;
+        });
 
         pendingMatchesData.forEach(pm => {
-            // ── Volatilidade: ruído aleatório para jogadores inconsistentes ──
             let p_final = Math.max(0.02, Math.min(0.98, pm.p_final_base + (Math.random() - 0.5) * pm.vol));
 
             const winner = Math.random() < p_final ? pm.p1 : pm.p2;
             const loser = winner === pm.p1 ? pm.p2 : pm.p1;
             simPoints[winner] += ptsWin;
             simPoints[loser] += ptsLoss;
+            simWins[winner] += 1;
+            simLosses[loser] += 1;
         });
 
-        // ── ETAPA 7: Ranking por pontuação final ──
+        // ── ETAPA 7: Ranking com desempates corretos ──
+        // Critérios: pontos → mais vitórias → menos derrotas
         const simResult = standings
-            .map(s => ({ id: s.id, pts: simPoints[s.id] }))
-            .sort((a, b) => b.pts - a.pts);
+            .map(s => ({
+                id: s.id,
+                pts: simPoints[s.id],
+                w: simWins[s.id],
+                l: simLosses[s.id]
+            }))
+            .sort((a, b) => {
+                if (b.pts !== a.pts) return b.pts - a.pts;
+                if (b.w !== a.w) return b.w - a.w;
+                return a.l - b.l;
+            });
 
         // Registrar Top 5
         for (let rank = 0; rank < 5 && rank < simResult.length; rank++) {
@@ -189,6 +217,15 @@ export function computeTop5Chances(standings, matches, activeSelective) {
     // ── ETAPA 8: Converter contagens em percentuais ──
     Object.keys(chances).forEach(id => {
         chances[id] = Math.round((chances[id] / SIMULATIONS) * 100);
+    });
+
+    // ── ETAPA 9: Floor matemático ──
+    // Se chance virou 0% mas o jogador AINDA pode matematicamente classificar,
+    // mostra 1% para sinalizar que existe caminho (não é impossível, é improvável).
+    standings.forEach(s => {
+        if (chances[s.id] === 0 && canMathematicallyReachTop5(s, standings, pendingMatches, ptsWin)) {
+            chances[s.id] = 1;
+        }
     });
 
     return chances;
