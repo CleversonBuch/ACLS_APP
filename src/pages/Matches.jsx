@@ -3,7 +3,7 @@ import { getPlayers, getSelectives, getMatchesBySelective, updateMatch, updateSe
 import { applyMatchResult, reverseMatchResult, recalculateAllRankings, getHeadToHeadResult } from '../data/rankingEngine.js';
 import { generateSwissRound } from '../data/tournamentEngine.js';
 import { computeTop5Chances } from '../data/monteCarloEngine.js';
-import { CheckCircle, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle, Target, TrendingUp, Sparkles, BrainCircuit, Swords, Activity, Zap, Search, Flame, ArrowUp, ArrowDown, Minus, RefreshCw, Trophy, Crown, Medal, Star, Play } from 'lucide-react';
+import { CheckCircle, X, XCircle, Undo2, Trash2, AlertTriangle, Loader, HelpCircle, Target, TrendingUp, Sparkles, BrainCircuit, Swords, Activity, Zap, Search, Flame, ArrowUp, ArrowDown, Minus, RefreshCw, Trophy, Crown, Medal, Star, Play } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useAdmin } from '../contexts/AdminContext.jsx';
 import TiebreakerHelpModal from '../components/TiebreakerHelpModal.jsx';
@@ -543,6 +543,16 @@ export default function Matches() {
                     .sel-header-wrap { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
                     .mob-text-sm { font-size: 11px !important; }
                     .mob-text-md { font-size: 14px !important; }
+                    .ai-row { gap: 8px !important; padding: 7px 9px !important; }
+                    .ai-row-pos { display: none !important; }
+                    .ai-row-avatar { width: 26px !important; height: 26px !important; }
+                    .ai-row-name { width: auto !important; flex: 1 1 0 !important; min-width: 0 !important; }
+                    .ai-row-bar { display: none !important; }
+                    .ai-row-chance { width: 42px !important; }
+                    .ai-row-status { display: none !important; }
+                    .ai-module-header { padding: 14px 16px 10px !important; }
+                    .ai-module-rows { padding: 6px 12px 14px !important; }
+                    .ai-module-footer { padding: 8px 14px 12px !important; }
                 }
             `}</style>
 
@@ -744,7 +754,7 @@ export default function Matches() {
                             <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(52,211,153,0.12), transparent 70%)', filter: 'blur(20px)', pointerEvents: 'none' }} />
 
                             {/* Header */}
-                            <div style={{ padding: '18px 22px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', flexWrap: 'wrap', gap: 8 }}>
+                            <div className="ai-module-header" style={{ padding: '18px 22px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', flexWrap: 'wrap', gap: 8 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                     <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg, rgba(52,211,153,0.2), rgba(16,185,129,0.08))', border: '1px solid rgba(52,211,153,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(52,211,153,0.15)' }}>
                                         <BrainCircuit size={18} color="#34d399" />
@@ -769,7 +779,7 @@ export default function Matches() {
                             </div>
 
                             {/* Player rows */}
-                            <div style={{ padding: '6px 18px 18px', display: 'flex', flexDirection: 'column', gap: 7, position: 'relative' }}>
+                            <div className="ai-module-rows" style={{ padding: '6px 18px 18px', display: 'flex', flexDirection: 'column', gap: 7, position: 'relative' }}>
                                 {standings.map((s, idx) => {
                                     const chance = top5Chances[s.id] || 0;
                                     const isLikely = chance >= 70;
@@ -778,7 +788,7 @@ export default function Matches() {
                                     const bgColor = isLikely ? 'rgba(52,211,153,0.06)' : isMaybe ? 'rgba(251,191,36,0.05)' : chance > 0 ? 'rgba(248,113,113,0.04)' : 'rgba(255,255,255,0.02)';
                                     const borderColor = isLikely ? 'rgba(52,211,153,0.18)' : isMaybe ? 'rgba(251,191,36,0.15)' : chance > 0 ? 'rgba(248,113,113,0.12)' : 'rgba(148,163,184,0.06)';
                                     return (
-                                        <div key={s.id} style={{
+                                        <div key={s.id} className="ai-row" style={{
                                             display: 'flex', alignItems: 'center', gap: 12,
                                             padding: '8px 12px',
                                             background: bgColor,
@@ -790,23 +800,23 @@ export default function Matches() {
                                             onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = borderColor; }}
                                         >
                                             {/* Position */}
-                                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800, color: '#475569', width: 16, textAlign: 'center', flexShrink: 0 }}>
+                                            <div className="ai-row-pos" style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800, color: '#475569', width: 16, textAlign: 'center', flexShrink: 0 }}>
                                                 {idx + 1}
                                             </div>
 
                                             {/* Avatar */}
-                                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `1.5px solid ${color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color, flexShrink: 0, overflow: 'hidden', boxShadow: chance >= 70 ? `0 0 12px ${color}30` : 'none' }}>
+                                            <div className="ai-row-avatar" style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `1.5px solid ${color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color, flexShrink: 0, overflow: 'hidden', boxShadow: chance >= 70 ? `0 0 12px ${color}30` : 'none' }}>
                                                 {s.photo ? <img src={s.photo} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(s.name)}
                                             </div>
 
                                             {/* Name */}
-                                            <div style={{ width: 110, flexShrink: 0, minWidth: 0 }}>
+                                            <div className="ai-row-name" style={{ width: 110, flexShrink: 0, minWidth: 0 }}>
                                                 <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.nickname || s.name?.split(' ')[0]}</div>
                                                 <div style={{ fontSize: 9, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>{s.points}pts</div>
                                             </div>
 
                                             {/* Bar */}
-                                            <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 99, overflow: 'hidden', position: 'relative', minWidth: 60 }}>
+                                            <div className="ai-row-bar" style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 99, overflow: 'hidden', position: 'relative', minWidth: 60 }}>
                                                 <div style={{
                                                     height: '100%',
                                                     width: `${Math.max(chance, 1)}%`,
@@ -822,13 +832,13 @@ export default function Matches() {
                                             </div>
 
                                             {/* Chance % */}
-                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 1, fontFamily: 'var(--font-display)', fontWeight: 900, width: 52, justifyContent: 'flex-end', flexShrink: 0 }}>
+                                            <div className="ai-row-chance" style={{ display: 'flex', alignItems: 'baseline', gap: 1, fontFamily: 'var(--font-display)', fontWeight: 900, width: 52, justifyContent: 'flex-end', flexShrink: 0 }}>
                                                 <span style={{ fontSize: 18, color, lineHeight: 1, textShadow: chance >= 70 ? `0 0 12px ${color}80` : 'none' }}>{chance}</span>
                                                 <span style={{ fontSize: 10, color: `${color}aa`, fontWeight: 700 }}>%</span>
                                             </div>
 
                                             {/* Status badge */}
-                                            <div style={{ width: 56, flexShrink: 0, textAlign: 'right' }}>
+                                            <div className="ai-row-status" style={{ width: 56, flexShrink: 0, textAlign: 'right' }}>
                                                 {chance >= 90 ? (
                                                     <span style={{ fontSize: 9, fontWeight: 800, color: '#34d399', background: 'rgba(52,211,153,0.12)', padding: '2px 6px', borderRadius: 6, letterSpacing: 0.4, textTransform: 'uppercase' }}>Garantido</span>
                                                 ) : chance >= 70 ? (
@@ -847,7 +857,7 @@ export default function Matches() {
                             </div>
 
                             {/* Footer hint */}
-                            <div style={{ padding: '0 22px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#475569', borderTop: '1px solid rgba(148,163,184,0.05)', paddingTop: 10, marginTop: 2 }}>
+                            <div className="ai-module-footer" style={{ padding: '0 22px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#475569', borderTop: '1px solid rgba(148,163,184,0.05)', paddingTop: 10, marginTop: 2 }}>
                                 <Sparkles size={10} color="#34d399" />
                                 <span>Atualizado a cada resultado · Considera força, momentum, qualidade das vitórias e desempates</span>
                             </div>
