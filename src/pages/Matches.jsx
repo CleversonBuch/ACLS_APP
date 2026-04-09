@@ -529,6 +529,8 @@ export default function Matches() {
                 @keyframes fadeInUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
                 @keyframes spin{to{transform:rotate(360deg)}}
                 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.2)}}
+                @keyframes shimmer-ai{0%{background-position:-200% 0}100%{background-position:200% 0}}
+                @keyframes float-orb{0%,100%{transform:translate(0,0)}50%{transform:translate(10px,-10px)}}
                 .sel-tab:hover{background:rgba(52,211,153,0.08)!important;color:#e2e8f0!important;}
                 .match-row-hover:hover{background:rgba(52,211,153,0.04)!important;transform:translateX(1px);}
                 .match-row-hover{transition:all 0.18s ease!important;}
@@ -729,32 +731,125 @@ export default function Matches() {
 
                     {/* ── AI Module ── */}
                     {standings.length > 0 && progress < 100 && (
-                        <div style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.05), rgba(15,20,32,0.98))', border: '1px solid rgba(52,211,153,0.15)', borderLeft: '3px solid #10b981', borderRadius: 20, overflow: 'hidden', marginBottom: 20, position: 'relative' }}>
-                            <div style={{ padding: '16px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <BrainCircuit size={16} color="#34d399" />
-                                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>Módulo Dinâmico IA</span>
-                                    <button onClick={() => setAiModalOpen(true)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 4 }}><HelpCircle size={13} /></button>
+                        <div style={{
+                            background: 'radial-gradient(ellipse at top left, rgba(52,211,153,0.08), rgba(15,20,32,0.98) 60%)',
+                            border: '1px solid rgba(52,211,153,0.2)',
+                            borderRadius: 22, overflow: 'hidden', marginBottom: 20, position: 'relative',
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.3), 0 0 60px rgba(52,211,153,0.06)',
+                        }}>
+                            {/* Top accent line with shimmer */}
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent 0%, #10b981 30%, #34d399 50%, #10b981 70%, transparent 100%)', backgroundSize: '200% 100%', animation: 'shimmer-ai 4s linear infinite' }} />
+
+                            {/* Glow orb */}
+                            <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(52,211,153,0.12), transparent 70%)', filter: 'blur(20px)', pointerEvents: 'none' }} />
+
+                            {/* Header */}
+                            <div style={{ padding: '18px 22px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', flexWrap: 'wrap', gap: 8 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg, rgba(52,211,153,0.2), rgba(16,185,129,0.08))', border: '1px solid rgba(52,211,153,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(52,211,153,0.15)' }}>
+                                        <BrainCircuit size={18} color="#34d399" />
+                                    </div>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15, color: '#f1f5f9', letterSpacing: 0.3 }}>Módulo Dinâmico IA</span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 800, color: '#34d399', background: 'rgba(52,211,153,0.12)', padding: '2px 7px', borderRadius: 10, border: '1px solid rgba(52,211,153,0.25)' }}>
+                                                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 6px #34d399', animation: 'pulse 1.6s ease-in-out infinite' }} />
+                                                LIVE
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>Monte Carlo · 5000 simulações</div>
+                                    </div>
+                                    <button onClick={() => setAiModalOpen(true)} title="Como funciona" style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', color: '#34d399', cursor: 'pointer', padding: 5, borderRadius: 8, display: 'flex' }}>
+                                        <HelpCircle size={13} />
+                                    </button>
                                 </div>
-                                <span style={{ fontSize: 11, color: '#34d399', background: 'rgba(52,211,153,0.1)', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>Chances Top 5</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#34d399', background: 'rgba(52,211,153,0.08)', padding: '4px 12px', borderRadius: 20, fontWeight: 700, border: '1px solid rgba(52,211,153,0.2)' }}>
+                                    <Trophy size={11} /> Chances Top 5
+                                </span>
                             </div>
-                            <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {standings.map(s => {
+
+                            {/* Player rows */}
+                            <div style={{ padding: '6px 18px 18px', display: 'flex', flexDirection: 'column', gap: 7, position: 'relative' }}>
+                                {standings.map((s, idx) => {
                                     const chance = top5Chances[s.id] || 0;
-                                    const color = chance > 80 ? '#34d399' : chance > 40 ? '#fbbf24' : '#f87171';
+                                    const isLikely = chance >= 70;
+                                    const isMaybe = chance >= 30 && chance < 70;
+                                    const color = isLikely ? '#34d399' : isMaybe ? '#fbbf24' : chance > 0 ? '#f87171' : '#475569';
+                                    const bgColor = isLikely ? 'rgba(52,211,153,0.06)' : isMaybe ? 'rgba(251,191,36,0.05)' : chance > 0 ? 'rgba(248,113,113,0.04)' : 'rgba(255,255,255,0.02)';
+                                    const borderColor = isLikely ? 'rgba(52,211,153,0.18)' : isMaybe ? 'rgba(251,191,36,0.15)' : chance > 0 ? 'rgba(248,113,113,0.12)' : 'rgba(148,163,184,0.06)';
                                     return (
-                                        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color, flexShrink: 0, overflow: 'hidden' }}>
+                                        <div key={s.id} style={{
+                                            display: 'flex', alignItems: 'center', gap: 12,
+                                            padding: '8px 12px',
+                                            background: bgColor,
+                                            border: `1px solid ${borderColor}`,
+                                            borderRadius: 12,
+                                            transition: 'all 0.25s',
+                                        }}
+                                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(2px)'; e.currentTarget.style.borderColor = `${color}40`; }}
+                                            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = borderColor; }}
+                                        >
+                                            {/* Position */}
+                                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 800, color: '#475569', width: 16, textAlign: 'center', flexShrink: 0 }}>
+                                                {idx + 1}
+                                            </div>
+
+                                            {/* Avatar */}
+                                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', border: `1.5px solid ${color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color, flexShrink: 0, overflow: 'hidden', boxShadow: chance >= 70 ? `0 0 12px ${color}30` : 'none' }}>
                                                 {s.photo ? <img src={s.photo} alt={s.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(s.name)}
                                             </div>
-                                            <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', width: 100, flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.nickname || s.name}</div>
-                                            <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 99, overflow: 'hidden' }}>
-                                                <div style={{ height: '100%', width: `${chance}%`, background: color, borderRadius: 99, transition: 'width 0.4s ease', boxShadow: `0 0 8px ${color}60` }} />
+
+                                            {/* Name */}
+                                            <div style={{ width: 110, flexShrink: 0, minWidth: 0 }}>
+                                                <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.nickname || s.name?.split(' ')[0]}</div>
+                                                <div style={{ fontSize: 9, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>{s.points}pts</div>
                                             </div>
-                                            <span style={{ fontSize: 13, fontWeight: 800, color, width: 38, textAlign: 'right', flexShrink: 0 }}>{chance}%</span>
+
+                                            {/* Bar */}
+                                            <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 99, overflow: 'hidden', position: 'relative', minWidth: 60 }}>
+                                                <div style={{
+                                                    height: '100%',
+                                                    width: `${Math.max(chance, 1)}%`,
+                                                    background: `linear-gradient(90deg, ${color}aa, ${color})`,
+                                                    borderRadius: 99,
+                                                    transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                    boxShadow: `0 0 10px ${color}80`,
+                                                    position: 'relative',
+                                                }}>
+                                                    {/* Inner shine */}
+                                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '50%', background: `linear-gradient(180deg, rgba(255,255,255,0.18), transparent)`, borderRadius: '99px 99px 0 0' }} />
+                                                </div>
+                                            </div>
+
+                                            {/* Chance % */}
+                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 1, fontFamily: 'var(--font-display)', fontWeight: 900, width: 52, justifyContent: 'flex-end', flexShrink: 0 }}>
+                                                <span style={{ fontSize: 18, color, lineHeight: 1, textShadow: chance >= 70 ? `0 0 12px ${color}80` : 'none' }}>{chance}</span>
+                                                <span style={{ fontSize: 10, color: `${color}aa`, fontWeight: 700 }}>%</span>
+                                            </div>
+
+                                            {/* Status badge */}
+                                            <div style={{ width: 56, flexShrink: 0, textAlign: 'right' }}>
+                                                {chance >= 90 ? (
+                                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#34d399', background: 'rgba(52,211,153,0.12)', padding: '2px 6px', borderRadius: 6, letterSpacing: 0.4, textTransform: 'uppercase' }}>Garantido</span>
+                                                ) : chance >= 70 ? (
+                                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#34d399', background: 'rgba(52,211,153,0.08)', padding: '2px 6px', borderRadius: 6, letterSpacing: 0.4, textTransform: 'uppercase' }}>Provável</span>
+                                                ) : chance >= 30 ? (
+                                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#fbbf24', background: 'rgba(251,191,36,0.08)', padding: '2px 6px', borderRadius: 6, letterSpacing: 0.4, textTransform: 'uppercase' }}>Disputa</span>
+                                                ) : chance > 0 ? (
+                                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#f87171', background: 'rgba(248,113,113,0.08)', padding: '2px 6px', borderRadius: 6, letterSpacing: 0.4, textTransform: 'uppercase' }}>Difícil</span>
+                                                ) : (
+                                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#475569', background: 'rgba(148,163,184,0.06)', padding: '2px 6px', borderRadius: 6, letterSpacing: 0.4, textTransform: 'uppercase' }}>Fora</span>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
+                            </div>
+
+                            {/* Footer hint */}
+                            <div style={{ padding: '0 22px 14px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#475569', borderTop: '1px solid rgba(148,163,184,0.05)', paddingTop: 10, marginTop: 2 }}>
+                                <Sparkles size={10} color="#34d399" />
+                                <span>Atualizado a cada resultado · Considera força, momentum, qualidade das vitórias e desempates</span>
                             </div>
                         </div>
                     )}
@@ -1111,42 +1206,135 @@ export default function Matches() {
 
             {/* ── AI Modal ── */}
             {aiModalOpen && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(8px)' }} onClick={() => setAiModalOpen(false)}>
-                    <div style={{ background: 'linear-gradient(135deg, #1a2332, #111827)', border: '1px solid rgba(52,211,153,0.2)', borderRadius: 20, padding: 28, maxWidth: 480, width: '90%', boxShadow: '0 24px 60px rgba(0,0,0,0.6)', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-                            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#34d399', fontSize: 17, fontWeight: 700, margin: 0 }}>
-                                <BrainCircuit size={20} /> Como funciona a IA?
-                            </h3>
-                            <button onClick={() => setAiModalOpen(false)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer' }}><XCircle size={20} /></button>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(10px)', padding: 16 }} onClick={() => setAiModalOpen(false)}>
+                    <div style={{
+                        background: 'radial-gradient(ellipse at top, rgba(52,211,153,0.08), #0f1420 70%)',
+                        border: '1px solid rgba(52,211,153,0.25)',
+                        borderRadius: 24, width: '100%', maxWidth: 540,
+                        boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 100px rgba(52,211,153,0.08)',
+                        maxHeight: '88vh', overflowY: 'auto', position: 'relative',
+                        animation: 'fadeInUp 0.3s ease',
+                    }} onClick={e => e.stopPropagation()}>
+                        {/* Top accent shimmer */}
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent, #10b981, #34d399, #10b981, transparent)', backgroundSize: '200% 100%', animation: 'shimmer-ai 4s linear infinite', borderRadius: '24px 24px 0 0' }} />
+
+                        {/* Header */}
+                        <div style={{ padding: '24px 26px 18px', borderBottom: '1px solid rgba(148,163,184,0.06)', display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, rgba(52,211,153,0.25), rgba(16,185,129,0.08))', border: '1px solid rgba(52,211,153,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 28px rgba(52,211,153,0.2)', flexShrink: 0 }}>
+                                <BrainCircuit size={26} color="#34d399" />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 800, color: '#f1f5f9', margin: 0, letterSpacing: 0.3 }}>
+                                    Como funciona a IA?
+                                </h3>
+                                <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>Motor Monte Carlo · 5000 simulações</p>
+                            </div>
+                            <button onClick={() => setAiModalOpen(false)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(148,163,184,0.1)', color: '#94a3b8', cursor: 'pointer', padding: 6, borderRadius: 10, display: 'flex' }}>
+                                <X size={18} />
+                            </button>
                         </div>
-                        <div style={{ color: '#cbd5e1', fontSize: 14, lineHeight: 1.6 }}>
-                            <p style={{ marginBottom: 16 }}>O <strong>Módulo Dinâmico de IA</strong> usa um motor de <strong>Monte Carlo Profissional</strong> com probabilidades calibradas e dinâmicas para prever as chances de cada jogador terminar no <strong>Top 5</strong>.</p>
-                            <div style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.1)', padding: 16, borderRadius: 12, marginBottom: 16 }}>
-                                <ul style={{ listStyleType: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                                    <li>
-                                        <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 4 }}>🎲 2000 Simulações Monte Carlo</div>
-                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>O torneio é simulado <strong>2000 vezes</strong>. Em cada simulação, os jogos restantes são jogados usando a força real de cada jogador — nunca chance igual para todos.</div>
-                                    </li>
-                                    <li>
-                                        <div style={{ color: '#60a5fa', fontWeight: 600, marginBottom: 4 }}>📐 Força com Laplace Smoothing</div>
-                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>A força de cada jogador é calculada como <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>(V+1)/(J+2)</code>, evitando distorções para quem jogou poucos jogos.</div>
-                                    </li>
-                                    <li>
-                                        <div style={{ color: '#fbbf24', fontWeight: 600, marginBottom: 4 }}>🎯 Calibração Anti-Superconfiança</div>
-                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>As probabilidades são suavizadas para evitar valores irreais como 99% logo no início. No começo do campeonato há mais incerteza; no final, as previsões ficam mais precisas.</div>
-                                    </li>
-                                    <li>
-                                        <div style={{ color: '#a78bfa', fontWeight: 600, marginBottom: 4 }}>⚡ Momentum e Qualidade das Vitórias</div>
-                                        <div style={{ fontSize: 13, color: '#94a3b8' }}>Jogadores em sequência de vitórias ganham bônus de força. Vitórias contra adversários mais fortes também aumentam o peso do jogador nas simulações.</div>
-                                    </li>
-                                </ul >
-                            </div >
-                            <p style={{ fontSize: 13, color: '#64748b', textAlign: 'center' }}>Atualizado automaticamente a cada resultado registrado.</p>
-                        </div >
-                    </div >
-                </div >
-            )
-            }
+
+                        {/* Body */}
+                        <div style={{ padding: '20px 26px 24px' }}>
+                            <p style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.6, marginBottom: 18 }}>
+                                A IA simula o restante do torneio milhares de vezes, calculando a chance de cada jogador terminar no <strong style={{ color: '#34d399' }}>Top 5</strong>. Não é "chute aleatório" — usa a força real de cada jogador, momentum, qualidade das vitórias e regras de desempate.
+                            </p>
+
+                            {/* Steps */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                {[
+                                    {
+                                        icon: '🎲',
+                                        title: '5000 Simulações Monte Carlo',
+                                        desc: 'O torneio é jogado 5000 vezes em frações de segundo. Cada simulação respeita as forças individuais, regras de desempate e gera um ranking final.',
+                                        color: '#34d399', border: 'rgba(52,211,153,0.2)', bg: 'rgba(52,211,153,0.05)'
+                                    },
+                                    {
+                                        icon: '📐',
+                                        title: 'Força com Laplace Smoothing',
+                                        desc: <>Calculada como <code style={{ background: 'rgba(96,165,250,0.1)', padding: '2px 7px', borderRadius: 5, fontSize: 12, color: '#60a5fa', fontFamily: 'monospace' }}>(V+1)/(J+2)</code>, evita distorções para quem jogou poucos jogos. Quem ganhou 2 de 2 jogos não vira "100% imbatível".</>,
+                                        color: '#60a5fa', border: 'rgba(96,165,250,0.2)', bg: 'rgba(96,165,250,0.05)'
+                                    },
+                                    {
+                                        icon: '🎯',
+                                        title: 'Calibração Anti-Superconfiança',
+                                        desc: 'Probabilidades são suavizadas pra evitar valores irreais. No início do torneio há mais incerteza; quanto mais jogos completos, mais precisas ficam as previsões.',
+                                        color: '#fbbf24', border: 'rgba(251,191,36,0.2)', bg: 'rgba(251,191,36,0.05)'
+                                    },
+                                    {
+                                        icon: '⚡',
+                                        title: 'Momentum e Qualidade',
+                                        desc: 'Jogadores em sequência de vitórias ganham bônus de força. Vencer adversários fortes vale mais que vencer fracos — a IA pesa essa qualidade.',
+                                        color: '#a78bfa', border: 'rgba(167,139,250,0.2)', bg: 'rgba(167,139,250,0.05)'
+                                    },
+                                    {
+                                        icon: '🧮',
+                                        title: 'Desempates Corretos',
+                                        desc: 'A simulação respeita pontos → vitórias → derrotas, igual à classificação real. Não decide só por pontos.',
+                                        color: '#22d3ee', border: 'rgba(34,211,238,0.2)', bg: 'rgba(34,211,238,0.05)'
+                                    },
+                                    {
+                                        icon: '🛡️',
+                                        title: 'Verificação Matemática',
+                                        desc: <>Quando um jogador <strong>ainda pode</strong> matematicamente classificar (vencendo todos os jogos restantes), a IA mostra pelo menos <strong style={{ color: '#34d399' }}>1%</strong> — distinguindo "improvável" de "impossível".</>,
+                                        color: '#fb923c', border: 'rgba(251,146,60,0.2)', bg: 'rgba(251,146,60,0.05)'
+                                    },
+                                ].map((step, i) => (
+                                    <div key={i} style={{
+                                        background: step.bg,
+                                        border: `1px solid ${step.border}`,
+                                        borderRadius: 12,
+                                        padding: '12px 14px',
+                                        display: 'flex', gap: 12,
+                                        transition: 'all 0.2s',
+                                    }}
+                                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(2px)'; e.currentTarget.style.borderColor = step.color + '55'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = step.border; }}
+                                    >
+                                        <div style={{ width: 32, height: 32, borderRadius: 9, background: `${step.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0, border: `1px solid ${step.color}25` }}>
+                                            {step.icon}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, color: step.color, marginBottom: 3 }}>
+                                                {step.title}
+                                            </div>
+                                            <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.55 }}>
+                                                {step.desc}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Color legend */}
+                            <div style={{ marginTop: 18, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(148,163,184,0.08)' }}>
+                                <div style={{ fontSize: 10, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Como interpretar</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                    {[
+                                        { label: 'Garantido', range: '90%+', color: '#34d399' },
+                                        { label: 'Provável', range: '70-89%', color: '#34d399' },
+                                        { label: 'Disputa', range: '30-69%', color: '#fbbf24' },
+                                        { label: 'Difícil', range: '1-29%', color: '#f87171' },
+                                        { label: 'Fora', range: '0%', color: '#475569' },
+                                    ].map(l => (
+                                        <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 8, background: `${l.color}10`, border: `1px solid ${l.color}20` }}>
+                                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: l.color, boxShadow: `0 0 5px ${l.color}` }} />
+                                            <span style={{ fontSize: 10, fontWeight: 700, color: l.color }}>{l.label}</span>
+                                            <span style={{ fontSize: 9, color: '#64748b', fontWeight: 600 }}>{l.range}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 10, background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.12)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Sparkles size={13} color="#34d399" />
+                                <span style={{ fontSize: 11, color: '#94a3b8' }}>Atualizado automaticamente a cada resultado registrado</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Head-to-Head Modal ── */}
             {h2hModalPlayer && (() => {
