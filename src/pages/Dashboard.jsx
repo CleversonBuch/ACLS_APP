@@ -241,7 +241,7 @@ export default function Dashboard() {
     const lastSelective = selectives.filter(s => s.status === 'completed').slice(-1)[0];
     const nextSelective = selectives.filter(s => s.status === 'active').slice(0, 1)[0];
 
-    // ── Active selective with progress ──
+    // ── Active selective with progress (seletivas) ──
     const activeSelectiveData = (() => {
         const active = selectives.find(s => s.status === 'active' && s.eventType !== 'etapa');
         if (!active) return null;
@@ -254,21 +254,81 @@ export default function Dashboard() {
         return { selective: active, completed, total, progress, nextMatch };
     })();
 
-    // ── Recent activity feed (last 10 completed matches) ──
+    // ── Active etapa with progress (etapas) ──
+    const activeEtapaData = (() => {
+        const active = selectives.find(s => s.status === 'active' && s.eventType === 'etapa');
+        if (!active) return null;
+        const confronts = active.teamConfronts || (active.teamConfront ? [active.teamConfront] : []);
+        let completedSlots = 0, totalSlots = 0;
+        confronts.forEach(c => {
+            const slots = c.slots || [];
+            totalSlots += slots.length;
+            completedSlots += slots.filter(sl => sl.result != null).length;
+        });
+        const progress = totalSlots > 0 ? Math.round((completedSlots / totalSlots) * 100) : 0;
+        return { selective: active, completed: completedSlots, total: totalSlots, progress, confrontCount: confronts.length };
+    })();
+
+    // ── Total matches + etapa slots for stats ──
+    const totalMatchesGlobal = (() => {
+        const matchCount = allMatches.filter(m => m.status === 'completed' && m.winnerId).length;
+        let etapaSlots = 0;
+        selectives.filter(s => s.eventType === 'etapa').forEach(s => {
+            const confronts = s.teamConfronts || (s.teamConfront ? [s.teamConfront] : []);
+            confronts.forEach(c => {
+                etapaSlots += (c.slots || []).filter(sl => sl.result != null).length;
+            });
+        });
+        return matchCount + etapaSlots;
+    })();
+
+    // ── Recent activity feed (seletiva matches + etapa team confront results) ──
     const recentActivity = (() => {
         const playersById = {};
         rankings.forEach(p => { playersById[p.id] = p; });
-        const completed = allMatches
+
+        // Seletiva matches
+        const matchItems = allMatches
             .filter(m => m.status === 'completed' && m.winnerId && m.player1Id && m.player2Id)
             .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
-            .slice(0, 10);
-        return completed.map(m => {
-            const winner = playersById[m.winnerId];
-            const loserId = m.winnerId === m.player1Id ? m.player2Id : m.player1Id;
-            const loser = playersById[loserId];
-            const sel = selectives.find(s => s.id === m.selectiveId);
-            return { match: m, winner, loser, selective: sel };
-        }).filter(x => x.winner && x.loser);
+            .slice(0, 15)
+            .map(m => {
+                const winner = playersById[m.winnerId];
+                const loserId = m.winnerId === m.player1Id ? m.player2Id : m.player1Id;
+                const loser = playersById[loserId];
+                const sel = selectives.find(s => s.id === m.selectiveId);
+                return { type: 'match', winner, loser, selective: sel, time: m.updatedAt || m.createdAt, id: m.id };
+            })
+            .filter(x => x.winner && x.loser);
+
+        // Etapa team confront results
+        const etapaItems = [];
+        selectives.filter(s => s.eventType === 'etapa').forEach(etapa => {
+            const confronts = etapa.teamConfronts || (etapa.teamConfront ? [etapa.teamConfront] : []);
+            confronts.forEach((c, ci) => {
+                (c.slots || []).forEach((sl, si) => {
+                    if (sl.result && sl.playerId) {
+                        const player = playersById[sl.playerId];
+                        if (player) {
+                            etapaItems.push({
+                                type: 'etapa',
+                                player,
+                                result: sl.result,
+                                opponentName: sl.opponentName || c.opponentTeam || '?',
+                                selective: etapa,
+                                time: etapa.updatedAt || etapa.createdAt,
+                                id: `${etapa.id}-${ci}-${si}`
+                            });
+                        }
+                    }
+                });
+            });
+        });
+
+        // Merge and sort by time, take latest 12
+        return [...matchItems, ...etapaItems]
+            .sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0))
+            .slice(0, 12);
     })();
 
     // ── Em Alta: players with biggest position gain since last event ──
@@ -511,7 +571,7 @@ export default function Dashboard() {
                 />
                 <StatCard
                     icon={Gamepad2}
-                    value={stats.totalMatches || 0}
+                    value={totalMatchesGlobal || stats.totalMatches || 0}
                     label="Total de Jogos"
                     color="#fbbf24"
                     gradient="linear-gradient(135deg, #f59e0b, #d97706)"
@@ -663,6 +723,35 @@ export default function Dashboard() {
                                 </div>
                             ))
                         )}
+
+                        {/* Active Etapa card */}
+                        {activeEtapaData && (
+                            <div onClick={() => navigate('/etapas')} style={{
+                                background: 'linear-gradient(135deg, rgba(251,191,36,0.08), rgba(15,20,32,0.6))',
+                                border: '1px solid rgba(251,191,36,0.25)',
+                                borderRadius: 14, padding: '12px 14px',
+                                cursor: 'pointer', transition: 'all 0.2s',
+                            }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(15,20,32,0.6))'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(251,191,36,0.08), rgba(15,20,32,0.6))'; }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fbbf24', boxShadow: '0 0 8px #fbbf24', animation: 'pulse 1.6s ease-in-out infinite' }} />
+                                    <span style={{ fontSize: 9, fontWeight: 800, color: '#fbbf24', letterSpacing: 1, textTransform: 'uppercase' }}>Etapa Ativa</span>
+                                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#fbbf24', fontWeight: 800 }}>{activeEtapaData.progress}%</span>
+                                </div>
+                                <div style={{ fontWeight: 700, fontSize: 13, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>{activeEtapaData.selective.name}</div>
+                                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>
+                                    {activeEtapaData.completed}/{activeEtapaData.total} slots · {activeEtapaData.confrontCount} confronto{activeEtapaData.confrontCount > 1 ? 's' : ''}
+                                </div>
+                                <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden', marginBottom: 6 }}>
+                                    <div style={{ height: '100%', width: `${activeEtapaData.progress}%`, background: 'linear-gradient(90deg, #f59e0b, #fbbf24)', borderRadius: 99, boxShadow: '0 0 8px rgba(251,191,36,0.4)' }} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, fontSize: 11, color: '#fbbf24', fontWeight: 700 }}>
+                                    Ir para Etapa <ArrowRight size={11} />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -771,22 +860,39 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <div style={{ padding: '4px 12px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                {recentActivity.map(({ match, winner, loser, selective }) => (
-                                    <div key={match.id} className="activity-row" onClick={() => setH2hModalPlayer(winner)} style={{
+                                {recentActivity.map(item => item.type === 'match' ? (
+                                    <div key={item.id} className="activity-row" onClick={() => setH2hModalPlayer(item.winner)} style={{
                                         display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
                                     }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
                                             <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(52,211,153,0.1)', border: '1.5px solid rgba(52,211,153,0.3)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                {winner.photo ? <img src={winner.photo} alt={winner.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 9, color: '#34d399', fontWeight: 800 }}>{getInitials(winner.name)}</span>}
+                                                {item.winner.photo ? <img src={item.winner.photo} alt={item.winner.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 9, color: '#34d399', fontWeight: 800 }}>{getInitials(item.winner.name)}</span>}
                                             </div>
-                                            <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>{winner.nickname || winner.name?.split(' ')[0]}</span>
+                                            <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>{item.winner.nickname || item.winner.name?.split(' ')[0]}</span>
                                             <span style={{ fontSize: 10, color: '#475569', fontWeight: 600 }}>venceu</span>
-                                            <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>{loser.nickname || loser.name?.split(' ')[0]}</span>
+                                            <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>{item.loser.nickname || item.loser.name?.split(' ')[0]}</span>
                                         </div>
-                                        {selective && (
-                                            <span className="hide-mob" style={{ fontSize: 10, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 110, padding: '2px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>{selective.name}</span>
+                                        {item.selective && (
+                                            <span className="hide-mob" style={{ fontSize: 10, color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 110, padding: '2px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>{item.selective.name}</span>
                                         )}
-                                        <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>{timeAgo(match.updatedAt || match.createdAt)}</span>
+                                        <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>{timeAgo(item.time)}</span>
+                                    </div>
+                                ) : (
+                                    <div key={item.id} className="activity-row" onClick={() => setH2hModalPlayer(item.player)} style={{
+                                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+                                            <div style={{ width: 26, height: 26, borderRadius: '50%', background: item.result === 'win' ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)', border: `1.5px solid ${item.result === 'win' ? 'rgba(52,211,153,0.3)' : 'rgba(239,68,68,0.3)'}`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                {item.player.photo ? <img src={item.player.photo} alt={item.player.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 9, color: item.result === 'win' ? '#34d399' : '#f87171', fontWeight: 800 }}>{getInitials(item.player.name)}</span>}
+                                            </div>
+                                            <span style={{ fontSize: 12, fontWeight: 700, color: item.result === 'win' ? '#34d399' : '#f87171', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>{item.player.nickname || item.player.name?.split(' ')[0]}</span>
+                                            <span style={{ fontSize: 10, color: '#475569', fontWeight: 600 }}>{item.result === 'win' ? 'venceu' : 'perdeu de'}</span>
+                                            <span style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 100 }}>{item.opponentName}</span>
+                                        </div>
+                                        {item.selective && (
+                                            <span className="hide-mob" style={{ fontSize: 10, color: '#fbbf24', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 110, padding: '2px 8px', background: 'rgba(251,191,36,0.06)', borderRadius: 6, border: '1px solid rgba(251,191,36,0.15)' }}>🏟️ {item.selective.name}</span>
+                                        )}
+                                        <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>{timeAgo(item.time)}</span>
                                     </div>
                                 ))}
                             </div>
